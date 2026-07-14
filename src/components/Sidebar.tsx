@@ -3,6 +3,7 @@ import {
   CalendarDays,
   FileStack,
   LayoutDashboard,
+  Link2,
   PenLine,
   Settings,
   Sparkles,
@@ -11,6 +12,7 @@ import {
 export type PageKey =
   | 'dashboard'
   | 'compose'
+  | 'connections'
   | 'mentions'
   | 'campaigns'
   | 'calendar'
@@ -24,7 +26,8 @@ interface SidebarProps {
 const items = [
   { key: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
   { key: 'compose' as const, label: 'Create', icon: PenLine },
-  { key: 'mentions' as const, label: 'Mentions', icon: AtSign },
+  { key: 'connections' as const, label: 'Connect socials', icon: Link2 },
+  { key: 'mentions' as const, label: 'Identity book', icon: AtSign },
   { key: 'campaigns' as const, label: 'Campaigns', icon: FileStack },
   { key: 'calendar' as const, label: 'Calendar', icon: CalendarDays },
   { key: 'settings' as const, label: 'Brand settings', icon: Settings },
@@ -39,7 +42,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         </span>
         <span>
           <strong>TagOnce</strong>
-          <small>Mention once. Publish everywhere.</small>
+          <small>Connect once. Tag everywhere.</small>
         </span>
       </button>
 
@@ -67,8 +70,8 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
       <div className="sidebar-footer">
         <div className="beta-note">
-          <strong>Vercel ready</strong>
-          <span>AI activates when an API key is added.</span>
+          <strong>Identity layer beta</strong>
+          <span>Manual linking now. Secure OAuth connections next.</span>
         </div>
       </div>
     </aside>
