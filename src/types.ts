@@ -16,6 +16,7 @@ export type ResolutionStatus =
   | 'unsupported';
 
 export type GenerationSource = 'ai' | 'rules';
+export type ConnectionMethod = 'manual' | 'oauth';
 
 export interface PlatformMapping {
   platform: Platform;
@@ -93,5 +94,9 @@ export interface SocialConnection {
   connected: boolean;
   accountName?: string;
   accountType?: string;
+  handle?: string;
+  profileUrl?: string;
+  platformId?: string;
+  connectionMethod?: ConnectionMethod;
   lastCheckedAt?: string;
 }
