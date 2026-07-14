@@ -19,6 +19,10 @@ The current release deliberately uses local persistence and mock publishing adap
 - Optional image upload and preview
 - Simulated multi-platform publishing queue
 - Campaign history
+- Dashboard and publishing calendar
+- Campaign scheduling
+- Optional server-side OpenAI generation on Vercel
+- Automatic fallback to the built-in generation engine when no API key is configured
 - Brand voice defaults
 - Browser persistence through `localStorage`
 - Responsive desktop and mobile layouts
@@ -112,8 +116,18 @@ The current implementation is a mock adapter. Each official integration can repl
 
 ## Environment variables
 
-No environment variables are required for this MVP. See `.env.example` for the planned production variables.
+No environment variables are required for the built-in generation engine. To activate AI generation on Vercel, add `OPENAI_API_KEY`; `OPENAI_MODEL` is optional. The API key stays inside the server-side Vercel Function and is never exposed to the browser.
 
 ## Product naming
 
 `TagOnce` is the working product name. Complete trademark, app-store, social-handle, and domain clearance before public launch.
+
+## Vercel deployment
+
+1. Import this GitHub repository into Vercel.
+2. Keep the framework preset as Vite.
+3. Add `OPENAI_API_KEY` in the Vercel project environment variables to activate AI generation.
+4. Optionally set `OPENAI_MODEL`; otherwise TagOnce uses `gpt-5-mini`.
+5. Deploy. The frontend uses `/api/generate`, implemented as a Vercel Function.
+
+Without an OpenAI key, the product remains functional and automatically uses its deterministic platform-formatting engine.

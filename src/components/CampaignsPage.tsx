@@ -5,9 +5,10 @@ import { PlatformMark } from './PlatformMark';
 interface CampaignsPageProps {
   campaigns: Campaign[];
   onDelete: (campaignId: string) => void;
+  onDuplicate: (campaign: Campaign) => void;
 }
 
-export function CampaignsPage({ campaigns, onDelete }: CampaignsPageProps) {
+export function CampaignsPage({ campaigns, onDelete, onDuplicate }: CampaignsPageProps) {
   return (
     <div className="page-stack">
       <section className="hero-panel compact-hero">
@@ -94,7 +95,7 @@ export function CampaignsPage({ campaigns, onDelete }: CampaignsPageProps) {
                     </td>
                     <td>
                       <div className="row-actions">
-                        <button className="icon-button" aria-label="Duplicate campaign">
+                        <button className="icon-button" aria-label="Duplicate campaign" onClick={() => onDuplicate(campaign)}>
                           <Copy size={16} />
                         </button>
                         <button

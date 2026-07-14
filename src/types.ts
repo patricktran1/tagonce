@@ -15,6 +15,8 @@ export type ResolutionStatus =
   | 'missing'
   | 'unsupported';
 
+export type GenerationSource = 'ai' | 'rules';
+
 export interface PlatformMapping {
   platform: Platform;
   displayName: string;
@@ -56,6 +58,7 @@ export interface PlatformVariant {
   limit?: number;
   mentionResolutions: MentionResolution[];
   format: string;
+  generatedBy?: GenerationSource;
 }
 
 export interface Campaign {
@@ -65,7 +68,13 @@ export interface Campaign {
   selectedEntityIds: string[];
   selectedPlatforms: Platform[];
   variants: PlatformVariant[];
-  status: 'draft' | 'ready' | 'publishing' | 'published' | 'partial';
+  status:
+    | 'draft'
+    | 'ready'
+    | 'scheduled'
+    | 'publishing'
+    | 'published'
+    | 'partial';
   createdAt: string;
   scheduledFor?: string;
   mediaName?: string;
@@ -77,4 +86,12 @@ export interface BrandSettings {
   voice: string;
   defaultCta: string;
   preferredHashtags: string;
+}
+
+export interface SocialConnection {
+  platform: Platform;
+  connected: boolean;
+  accountName?: string;
+  accountType?: string;
+  lastCheckedAt?: string;
 }

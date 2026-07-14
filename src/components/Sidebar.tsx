@@ -8,7 +8,13 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-export type PageKey = 'compose' | 'mentions' | 'campaigns' | 'settings';
+export type PageKey =
+  | 'dashboard'
+  | 'compose'
+  | 'mentions'
+  | 'campaigns'
+  | 'calendar'
+  | 'settings';
 
 interface SidebarProps {
   activePage: PageKey;
@@ -16,16 +22,18 @@ interface SidebarProps {
 }
 
 const items = [
+  { key: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
   { key: 'compose' as const, label: 'Create', icon: PenLine },
   { key: 'mentions' as const, label: 'Mentions', icon: AtSign },
   { key: 'campaigns' as const, label: 'Campaigns', icon: FileStack },
+  { key: 'calendar' as const, label: 'Calendar', icon: CalendarDays },
   { key: 'settings' as const, label: 'Brand settings', icon: Settings },
 ];
 
 export function Sidebar({ activePage, onNavigate }: SidebarProps) {
   return (
     <aside className="sidebar">
-      <button className="brand-lockup" onClick={() => onNavigate('compose')}>
+      <button className="brand-lockup" onClick={() => onNavigate('dashboard')}>
         <span className="brand-glyph">
           <Sparkles size={18} />
         </span>
@@ -45,11 +53,6 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
       <nav className="sidebar-nav" aria-label="Primary navigation">
         <div className="nav-label">Workspace</div>
-        <button className="nav-disabled" disabled>
-          <LayoutDashboard size={18} />
-          Dashboard
-          <span className="soon-pill">Soon</span>
-        </button>
         {items.map(({ key, label, icon: Icon }) => (
           <button
             className={activePage === key ? 'nav-item active' : 'nav-item'}
@@ -60,17 +63,12 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             {label}
           </button>
         ))}
-        <button className="nav-disabled" disabled>
-          <CalendarDays size={18} />
-          Calendar
-          <span className="soon-pill">Soon</span>
-        </button>
       </nav>
 
       <div className="sidebar-footer">
         <div className="beta-note">
-          <strong>Local MVP</strong>
-          <span>No paid API keys required.</span>
+          <strong>Vercel ready</strong>
+          <span>AI activates when an API key is added.</span>
         </div>
       </div>
     </aside>

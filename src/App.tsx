@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import './App.css';
+import './release02.css';
+import { CalendarPage } from './components/CalendarPage';
 import { CampaignsPage } from './components/CampaignsPage';
-import { ComposePage } from './components/ComposePage';
+import { CampaignComposer } from './components/CampaignComposer';
+import { DashboardPage } from './components/DashboardPage';
 import { Header } from './components/Header';
 import { MentionDirectory } from './components/MentionDirectory';
 import { SettingsPage } from './components/SettingsPage';
 import { Sidebar, type PageKey } from './components/Sidebar';
-import {
-  defaultBrandSettings,
-  demoEntities,
-} from './data/demo';
+import { defaultBrandSettings, demoEntities } from './data/demo';
 import { loadLocal, saveLocal } from './lib/storage';
 import type { BrandSettings, Campaign, MentionEntity } from './types';
 
@@ -18,14 +18,16 @@ const CAMPAIGN_KEY = 'tagonce.campaigns.v1';
 const BRAND_KEY = 'tagonce.brand.v1';
 
 const pageMeta: Record<PageKey, { title: string; eyebrow: string }> = {
+  dashboard: { title: 'Dashboard', eyebrow: 'Workspace overview' },
   compose: { title: 'Create campaign', eyebrow: 'Content command center' },
   mentions: { title: 'Mention directory', eyebrow: 'Cross-platform identity graph' },
   campaigns: { title: 'Campaigns', eyebrow: 'Publishing history' },
+  calendar: { title: 'Calendar', eyebrow: 'Publishing schedule' },
   settings: { title: 'Brand settings', eyebrow: 'Generation defaults' },
 };
 
 export default function App() {
-  const [activePage, setActivePage] = useState<PageKey>('compose');
+  const [activePage, setActivePage] = useState<PageKey>('dashboard');
   const [entities, setEntities] = useState<MentionEntity[]>(() =>
     loadLocal(ENTITY_KEY, demoEntities),
   );
@@ -42,17 +44,28 @@ export default function App() {
 
   const currentMeta = pageMeta[activePage];
 
+  const saveCampaign = (campaign: Campaign) => {
+    setCampaigns((current) => [campaign, ...current]);
+  };
+
   const page = useMemo(() => {
     switch (activePage) {
+      case 'dashboard':
+        return (
+          <DashboardPage
+            campaigns={campaigns}
+            entities={entities}
+            onCreate={() => setActivePage('compose')}
+            onOpenCampaigns={() => setActivePage('campaigns')}
+          />
+        );
       case 'compose':
         return (
-          <ComposePage
+          <CampaignComposer
             entities={entities}
             brand={brand}
             onOpenMentions={() => setActivePage('mentions')}
-            onSaveCampaign={(campaign) =>
-              setCampaigns((current) => [campaign, ...current])
-            }
+            onSaveCampaign={saveCampaign}
           />
         );
       case 'mentions':
@@ -74,8 +87,20 @@ export default function App() {
                 current.filter((campaign) => campaign.id !== campaignId),
               )
             }
+            onDuplicate={(campaign) =>
+              saveCampaign({
+                ...campaign,
+                id: `campaign_${Date.now()}`,
+                title: `${campaign.title} copy`,
+                status: 'draft',
+                createdAt: new Date().toISOString(),
+                scheduledFor: undefined,
+              })
+            }
           />
         );
+      case 'calendar':
+        return <CalendarPage campaigns={campaigns} onCreate={() => setActivePage('compose')} />;
       case 'settings':
         return <SettingsPage brand={brand} onChange={setBrand} />;
     }
