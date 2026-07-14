@@ -1,0 +1,80 @@
+export type Platform =
+  | 'facebook'
+  | 'linkedin'
+  | 'instagram'
+  | 'x'
+  | 'threads'
+  | 'tiktok'
+  | 'youtube';
+
+export type EntityType = 'person' | 'company' | 'brand' | 'organization';
+
+export type ResolutionStatus =
+  | 'resolved'
+  | 'plain_text'
+  | 'missing'
+  | 'unsupported';
+
+export interface PlatformMapping {
+  platform: Platform;
+  displayName: string;
+  handle?: string;
+  platformId?: string;
+  profileUrl?: string;
+  nativeTagSupported: boolean;
+  verified: boolean;
+}
+
+export interface MentionEntity {
+  id: string;
+  displayName: string;
+  type: EntityType;
+  description?: string;
+  website?: string;
+  initials: string;
+  mappings: Partial<Record<Platform, PlatformMapping>>;
+  usageCount: number;
+  createdAt: string;
+}
+
+export interface MentionResolution {
+  entityId: string;
+  entityName: string;
+  platform: Platform;
+  renderedText: string;
+  status: ResolutionStatus;
+  nativeTagSupported: boolean;
+  detail: string;
+}
+
+export interface PlatformVariant {
+  platform: Platform;
+  body: string;
+  title?: string;
+  hashtags: string[];
+  characterCount: number;
+  limit?: number;
+  mentionResolutions: MentionResolution[];
+  format: string;
+}
+
+export interface Campaign {
+  id: string;
+  title: string;
+  masterText: string;
+  selectedEntityIds: string[];
+  selectedPlatforms: Platform[];
+  variants: PlatformVariant[];
+  status: 'draft' | 'ready' | 'publishing' | 'published' | 'partial';
+  createdAt: string;
+  scheduledFor?: string;
+  mediaName?: string;
+}
+
+export interface BrandSettings {
+  brandName: string;
+  audience: string;
+  voice: string;
+  defaultCta: string;
+  preferredHashtags: string;
+}
