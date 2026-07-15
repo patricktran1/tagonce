@@ -14,6 +14,7 @@ import {
   disconnectGoogleCalendar,
   getCalendarEventSuggestions,
   getCalendarStatus,
+  getRememberedGoogleCalendarAccount,
   type CalendarConnectionState,
   type CalendarEventSuggestion,
 } from '../lib/calendarService';
@@ -79,11 +80,13 @@ function validEmail(value: string) {
 }
 
 export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardLauncherProps) {
+  const initialRememberedAccount = getRememberedGoogleCalendarAccount();
   const [state, setState] = useState<CalendarConnectionState>('checking');
   const [events, setEvents] = useState<CalendarEventSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [googleEmail, setGoogleEmail] = useState(profile.email || '');
+  const [rememberedGoogleEmail, setRememberedGoogleEmail] = useState(initialRememberedAccount);
+  const [googleEmail, setGoogleEmail] = useState(initialRememberedAccount || profile.email || '');
   const [showEmailFallback, setShowEmailFallback] = useState(false);
 
   async function loadEvents() {
@@ -116,6 +119,12 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     let cancelled = false;
     async function initialize() {
       const oauthResult = new URLSearchParams(window.location.search).get('calendar') || '';
+      const verifiedAccount = getRememberedGoogleCalendarAccount();
+      if (validEmail(verifiedAccount)) {
+        setRememberedGoogleEmail(verifiedAccount);
+        setGoogleEmail(verifiedAccount);
+      }
+
       const callbackMessage = oauthResultMessages[oauthResult] || (
         oauthResult && oauthResult !== 'connected'
           ? `Google returned an unexpected result: ${oauthResult}.`
@@ -152,15 +161,14 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
   }, []);
 
   function connectWithGoogle() {
-    const accountHint = validEmail(googleEmail) ? googleEmail : '';
-    if (!accountHint) {
+    if (!validEmail(rememberedGoogleEmail)) {
       setShowEmailFallback(true);
-      setError('Enter the Google account email once so Safari can skip its stalled account chooser.');
+      setError('Confirm your Google account once. After Google verifies it, TagOnce will remember that account for one-click reconnects.');
       return;
     }
     setState('connecting');
     setError('');
-    connectGoogleCalendar('event', accountHint);
+    connectGoogleCalendar('event', rememberedGoogleEmail);
   }
 
   function connectWithEmail() {
@@ -171,6 +179,9 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
 
   async function disconnect() {
     await disconnectGoogleCalendar();
+    const verifiedAccount = getRememberedGoogleCalendarAccount();
+    setRememberedGoogleEmail(verifiedAccount);
+    if (verifiedAccount) setGoogleEmail(verifiedAccount);
     setState('disconnected');
     setEvents([]);
     setError('');
@@ -242,22 +253,29 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
             <span className="calendar-detection-icon"><CalendarCheck size={22} /></span>
             <div>
               <h3>Connect with Google</h3>
-              <p>Sign in and approve read-only access to your Calendar in one secure Google flow.</p>
+              <p>Approve read-only access to event titles, times and locations.</p>
               <div className="google-calendar-primary-connect">
                 <button className="google-oauth-button" type="button" onClick={connectWithGoogle}>
                   <GoogleMark />
                   <span>Continue with Google</span>
                 </button>
-                {validEmail(googleEmail) && <span>Continue as {googleEmail}</span>}
-                <small>TagOnce can read event titles, times and locations. It cannot edit your calendar.</small>
+                {validEmail(rememberedGoogleEmail) ? (
+                  <span>Continue as {rememberedGoogleEmail}</span>
+                ) : (
+                  <span>First connection: confirm the Google account once below.</span>
+                )}
+                <small>TagOnce can read your Calendar. It cannot edit it.</small>
               </div>
 
               <button
                 className="text-button calendar-fallback-toggle"
                 type="button"
-                onClick={() => setShowEmailFallback((current) => !current)}
+                onClick={() => {
+                  setShowEmailFallback((current) => !current);
+                  setError('');
+                }}
               >
-                {showEmailFallback ? 'Hide account options' : 'Use another Google account'}
+                {showEmailFallback ? 'Hide account options' : validEmail(rememberedGoogleEmail) ? 'Use another Google account' : 'Choose Google account'}
               </button>
 
               {showEmailFallback && (
@@ -280,7 +298,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
                       <CalendarCheck size={17} /> Continue
                     </button>
                   </div>
-                  <span className="calendar-account-help">This hint lets Google open the intended account without Safari's slow chooser.</span>
+                  <span className="calendar-account-help">Google verifies this account during authorization. TagOnce remembers only the verified account for future reconnects.</span>
                 </div>
               )}
             </div>
