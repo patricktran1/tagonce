@@ -5,6 +5,9 @@ type CalendarSession = {
   refreshToken?: string;
   expiresAt: number;
   scope?: string;
+  email?: string;
+  displayName?: string;
+  picture?: string;
 };
 
 type GoogleTokenResponse = {
@@ -12,6 +15,7 @@ type GoogleTokenResponse = {
   refresh_token?: string;
   expires_in?: number;
   scope?: string;
+  id_token?: string;
   error?: string;
   error_description?: string;
 };
@@ -35,24 +39,6 @@ function config(request: Request) {
   const redirectUri = `${new URL(request.url).origin}/api/google-calendar/callback`;
   if (!clientId || !clientSecret || !sessionSecret) return null;
   return { clientId, clientSecret, sessionSecret, redirectUri };
-}
-
-function parseCookies(request: Request) {
-  const values = new Map<string, string>();
-  const header = request.headers.get('cookie') || '';
-  header.split(';').forEach((part) => {
-    const separator = part.indexOf('=');
-    if (separator < 0) return;
-    const name = part.slice(0, separator).trim();
-    const value = part.slice(separator + 1).trim();
-    if (!name) return;
-    try {
-      values.set(name, decodeURIComponent(value));
-    } catch {
-      values.set(name, value);
-    }
-  });
-  return values;
 }
 
 function cookie(name: string, value: string, maxAge: number) {
@@ -128,7 +114,7 @@ async function verifySignedState(value: string | null, secret: string) {
   }
 }
 
-function redirect(request: Request, result: string, cookies: string[] = [], status = 302) {
+function redirect(request: Request, result: string, cookies: string[] = []) {
   const destination = new URL('/', request.url);
   destination.searchParams.set('calendar', result);
   const headers = new Headers({
@@ -136,7 +122,7 @@ function redirect(request: Request, result: string, cookies: string[] = [], stat
     'Cache-Control': 'no-store',
   });
   cookies.forEach((value) => headers.append('Set-Cookie', value));
-  return new Response(null, { status, headers });
+  return new Response(null, { status: 302, headers });
 }
 
 function tokenFailureCode(token: GoogleTokenResponse) {
@@ -147,72 +133,21 @@ function tokenFailureCode(token: GoogleTokenResponse) {
   return 'token_exchange';
 }
 
-async function handleGoogleSso(request: Request, clientId: string) {
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    return redirect(request, 'sso_response', [], 303);
-  }
-
-  const bodyCsrf = String(form.get('g_csrf_token') || '');
-  const cookieCsrf = parseCookies(request).get('g_csrf_token') || '';
-  if (!bodyCsrf || !cookieCsrf || bodyCsrf !== cookieCsrf) {
-    return redirect(request, 'sso_csrf', [], 303);
-  }
-
-  const credential = String(form.get('credential') || '');
-  if (!credential) return redirect(request, 'sso_response', [], 303);
-
-  try {
-    const { payload } = await jwtVerify(credential, GOOGLE_JWKS, {
-      audience: clientId,
-      issuer: ['https://accounts.google.com', 'accounts.google.com'],
-    });
-    const email = typeof payload.email === 'string' && payload.email_verified === true
-      ? payload.email.trim()
-      : '';
-    if (!email) return redirect(request, 'sso_email', [], 303);
-
-    const calendarAuthorization = new URL('/api/google-calendar/connect', request.url);
-    calendarAuthorization.searchParams.set('login_hint', email);
-    return new Response(null, {
-      status: 303,
-      headers: {
-        Location: calendarAuthorization.toString(),
-        'Cache-Control': 'no-store',
-      },
-    });
-  } catch (verificationError) {
-    console.error('Google Sign-In token verification failed', verificationError);
-    return redirect(request, 'sso_token', [], 303);
-  }
-}
-
 export default {
   async fetch(request: Request) {
-    const appConfig = config(request);
-    if (!appConfig) return redirect(request, 'unconfigured', [], request.method === 'POST' ? 303 : 302);
+    if (request.method !== 'GET') return new Response('Method not allowed', { status: 405 });
 
-    if (request.method === 'POST') {
-      return handleGoogleSso(request, appConfig.clientId);
-    }
-    if (request.method !== 'GET') {
-      return new Response('Method not allowed', { status: 405 });
-    }
+    const appConfig = config(request);
+    if (!appConfig) return redirect(request, 'unconfigured');
 
     const url = new URL(request.url);
     const error = url.searchParams.get('error');
     const state = url.searchParams.get('state');
     const code = url.searchParams.get('code');
 
-    if (error) {
-      return redirect(request, error === 'access_denied' ? 'cancelled' : 'google_error');
-    }
+    if (error) return redirect(request, error === 'access_denied' ? 'cancelled' : 'google_error');
     if (!code) return redirect(request, 'authorization_incomplete');
-    if (!(await verifySignedState(state, appConfig.sessionSecret))) {
-      return redirect(request, 'invalid_state');
-    }
+    if (!(await verifySignedState(state, appConfig.sessionSecret))) return redirect(request, 'invalid_state');
 
     let token: GoogleTokenResponse;
     try {
@@ -229,7 +164,7 @@ export default {
       });
       token = await tokenResponse.json().catch(() => ({})) as GoogleTokenResponse;
       if (!tokenResponse.ok || !token.access_token) {
-        console.error('Google Calendar token exchange failed', {
+        console.error('Google OAuth token exchange failed', {
           status: tokenResponse.status,
           error: token.error,
           description: token.error_description,
@@ -237,24 +172,38 @@ export default {
         return redirect(request, tokenFailureCode(token));
       }
     } catch (tokenError) {
-      console.error('Google Calendar token request failed', tokenError);
+      console.error('Google OAuth token request failed', tokenError);
       return redirect(request, 'token_exchange');
     }
 
+    if (!token.id_token) return redirect(request, 'identity_token');
+
     try {
+      const { payload } = await jwtVerify(token.id_token, GOOGLE_JWKS, {
+        audience: appConfig.clientId,
+        issuer: ['https://accounts.google.com', 'accounts.google.com'],
+      });
+      const email = typeof payload.email === 'string' && payload.email_verified === true
+        ? payload.email.trim()
+        : '';
+      if (!email) return redirect(request, 'identity_email');
+
       const session: CalendarSession = {
         accessToken: token.access_token,
         refreshToken: token.refresh_token,
         expiresAt: Date.now() + Math.max(60, token.expires_in || 3600) * 1000,
         scope: token.scope,
+        email,
+        displayName: typeof payload.name === 'string' ? payload.name : undefined,
+        picture: typeof payload.picture === 'string' ? payload.picture : undefined,
       };
       const sessionValue = await encryptSession(session, appConfig.sessionSecret);
       return redirect(request, 'connected', [
         cookie(SESSION_COOKIE, sessionValue, 60 * 60 * 24 * 180),
       ]);
-    } catch (sessionError) {
-      console.error('Google Calendar session creation failed', sessionError);
-      return redirect(request, 'session_error');
+    } catch (identityError) {
+      console.error('Google identity verification failed', identityError);
+      return redirect(request, 'identity_token');
     }
   },
 };
