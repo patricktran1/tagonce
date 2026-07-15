@@ -18,7 +18,6 @@ import {
   type CalendarEventSuggestion,
 } from '../lib/calendarService';
 import type { MyProfile } from '../types';
-import { GoogleSsoButton } from './GoogleSsoButton';
 
 interface EventCardLauncherProps {
   profile: MyProfile;
@@ -34,21 +33,30 @@ const relevanceLabels: Record<CalendarEventSuggestion['relevance'], string> = {
 };
 
 const oauthResultMessages: Record<string, string> = {
-  cancelled: 'Google Calendar connection was cancelled.',
+  cancelled: 'Google connection was cancelled.',
   invalid_state: 'Google returned to TagOnce, but the secure authorization state was invalid or expired. Start the connection again.',
   authorization_incomplete: 'Google returned without a complete authorization code. Start the connection again.',
-  client_credentials: 'The Google client secret in Vercel does not match the OAuth client ID. Replace GOOGLE_CALENDAR_CLIENT_SECRET with the secret from the same Google OAuth client.',
+  client_credentials: 'The Google client secret in Vercel does not match the OAuth client ID.',
   redirect_mismatch: 'Google rejected the callback address. Confirm the OAuth client contains https://tagonce.vercel.app/api/google-calendar/callback.',
   authorization_expired: 'The Google authorization code expired before it could be exchanged. Start the connection again.',
-  token_exchange: 'Google approved access, but TagOnce could not exchange the authorization code. Check the client secret and retry.',
+  token_exchange: 'Google approved access, but TagOnce could not exchange the authorization code. Retry once.',
+  identity_token: 'Google approved access, but TagOnce could not verify the Google identity. Retry once.',
+  identity_email: 'Google did not return a verified email address for this account.',
   session_error: 'Google approved access, but TagOnce could not create the encrypted Calendar session.',
   google_error: 'Google returned an authorization error. Start the connection again.',
   unconfigured: 'The TagOnce deployment is missing one or more Google Calendar environment variables.',
-  sso_csrf: 'Google Sign-In returned without a valid security token. Reload TagOnce and try the Google button again.',
-  sso_response: 'Google Sign-In returned an incomplete account response. Reload and try again.',
-  sso_email: 'Google did not return a verified email for that account. Use the email fallback below.',
-  sso_token: 'TagOnce could not verify the Google Sign-In response. Reload and try again.',
 };
+
+function GoogleMark() {
+  return (
+    <svg aria-hidden="true" className="google-mark" viewBox="0 0 24 24">
+      <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.19-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.55h3.24c1.9-1.75 2.98-4.33 2.98-7.42Z" />
+      <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.35l-3.24-2.55c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.05v2.62A10 10 0 0 0 12 22Z" />
+      <path fill="#FBBC05" d="M6.39 13.93A6 6 0 0 1 6.08 12c0-.67.11-1.32.31-1.93V7.45H3.05A10 10 0 0 0 2 12c0 1.62.39 3.15 1.05 4.55l3.34-2.62Z" />
+      <path fill="#EA4335" d="M12 5.94c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.65 9.65 0 0 0 12 2a10 10 0 0 0-8.95 5.45l3.34 2.62C7.18 7.7 9.39 5.94 12 5.94Z" />
+    </svg>
+  );
+}
 
 function eventTimeLabel(event: CalendarEventSuggestion) {
   const start = new Date(event.start);
@@ -110,7 +118,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
       const oauthResult = new URLSearchParams(window.location.search).get('calendar') || '';
       const callbackMessage = oauthResultMessages[oauthResult] || (
         oauthResult && oauthResult !== 'connected'
-          ? `Google Calendar returned an unexpected result: ${oauthResult}.`
+          ? `Google returned an unexpected result: ${oauthResult}.`
           : ''
       );
 
@@ -125,7 +133,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
         if (!status.connected) {
           setState('disconnected');
           if (oauthResult === 'connected') {
-            setError('Google approved Calendar access, but TagOnce could not read the new secure session cookie. Reload once in a normal browser window and reconnect.');
+            setError('Google approved access, but TagOnce could not read the secure session. Reload once and reconnect.');
           } else if (callbackMessage) {
             setError(callbackMessage);
           }
@@ -143,15 +151,22 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     return () => { cancelled = true; };
   }, []);
 
+  function connectWithGoogle() {
+    const accountHint = validEmail(googleEmail) ? googleEmail : '';
+    if (!accountHint) {
+      setShowEmailFallback(true);
+      setError('Enter the Google account email once so Safari can skip its stalled account chooser.');
+      return;
+    }
+    setState('connecting');
+    setError('');
+    connectGoogleCalendar('event', accountHint);
+  }
+
   function connectWithEmail() {
     setState('connecting');
     setError('');
     connectGoogleCalendar('event', googleEmail);
-  }
-
-  function beginGoogleSso() {
-    setState('connecting');
-    setError('');
   }
 
   async function disconnect() {
@@ -216,8 +231,8 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
           <div className="live-event-connect muted-calendar-state">
             <span className="calendar-detection-icon"><CalendarDays size={22} /></span>
             <div>
-              <h3>Calendar connection is temporarily unavailable</h3>
-              <p>The TagOnce deployment needs its Google OAuth client secret and session configuration. No user setup is required.</p>
+              <h3>Google connection is temporarily unavailable</h3>
+              <p>The TagOnce deployment needs its Google OAuth client secret and session configuration.</p>
             </div>
           </div>
         )}
@@ -226,11 +241,15 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
           <div className="live-event-connect">
             <span className="calendar-detection-icon"><CalendarCheck size={22} /></span>
             <div>
-              <h3>Connect Google Calendar</h3>
-              <p>Choose your Google account, then approve read-only access to event titles, times and locations.</p>
+              <h3>Connect with Google</h3>
+              <p>Sign in and approve read-only access to your Calendar in one secure Google flow.</p>
               <div className="google-calendar-primary-connect">
-                <GoogleSsoButton onStart={beginGoogleSso} />
-                <span>TagOnce cannot edit your calendar.</span>
+                <button className="google-oauth-button" type="button" onClick={connectWithGoogle}>
+                  <GoogleMark />
+                  <span>Continue with Google</span>
+                </button>
+                {validEmail(googleEmail) && <span>Continue as {googleEmail}</span>}
+                <small>TagOnce can read event titles, times and locations. It cannot edit your calendar.</small>
               </div>
 
               <button
@@ -238,7 +257,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
                 type="button"
                 onClick={() => setShowEmailFallback((current) => !current)}
               >
-                {showEmailFallback ? 'Hide email fallback' : 'Having trouble? Use email instead'}
+                {showEmailFallback ? 'Hide account options' : 'Use another Google account'}
               </button>
 
               {showEmailFallback && (
@@ -261,7 +280,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
                       <CalendarCheck size={17} /> Continue
                     </button>
                   </div>
-                  <span className="calendar-account-help">Used only to tell Google which signed-in account to open.</span>
+                  <span className="calendar-account-help">This hint lets Google open the intended account without Safari's slow chooser.</span>
                 </div>
               )}
             </div>
@@ -271,7 +290,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
         {state === 'connected' && !loading && events.length === 0 && (
           <div className="live-event-empty">
             <CalendarDays size={24} />
-            <strong>Calendar connected</strong>
+            <strong>Google Calendar connected</strong>
             <span>No nearby event was found. Create a timed event happening now or within the next three hours, then refresh.</span>
           </div>
         )}
@@ -298,7 +317,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
         )}
 
         {state === 'connected' && (
-          <button className="text-button live-event-disconnect" onClick={disconnect}><Unplug size={13} /> Disconnect calendar</button>
+          <button className="text-button live-event-disconnect" onClick={disconnect}><Unplug size={13} /> Disconnect Google</button>
         )}
         {error && <div className="inline-error">{error}</div>}
       </section>
