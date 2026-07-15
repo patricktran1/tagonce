@@ -20,6 +20,7 @@ import { ScanPage } from './components/ScanPage';
 import { SettingsPage } from './components/SettingsPage';
 import { Sidebar, type PageKey } from './components/Sidebar';
 import { defaultBrandSettings, demoEntities } from './data/demo';
+import { restoreGoogleCalendarReturn } from './lib/calendarService';
 import { loadLocal, saveLocal } from './lib/storage';
 import type {
   BrandSettings,
@@ -28,6 +29,8 @@ import type {
   MyProfile,
   SocialConnection,
 } from './types';
+
+restoreGoogleCalendarReturn();
 
 const ENTITY_KEY = 'tagonce.entities.v1';
 const CAMPAIGN_KEY = 'tagonce.campaigns.v1';
