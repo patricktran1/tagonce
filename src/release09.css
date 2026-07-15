@@ -1,0 +1,76 @@
+/* Release 0.9: GPS and event-aware meeting context helpers */
+.meeting-context-field {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.meeting-context-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.meeting-context-button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #ded8e4;
+  border-radius: 10px;
+  padding: 0 11px;
+  color: #5f5866;
+  background: #fff;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.meeting-context-button:hover:not(:disabled) {
+  border-color: rgba(167, 137, 255, 0.55);
+  color: var(--lavender-deep);
+  background: #fbfaff;
+}
+
+.meeting-context-button:disabled {
+  opacity: 0.62;
+  cursor: wait;
+}
+
+.event-context-button {
+  max-width: 100%;
+  overflow: hidden;
+  color: #51475d;
+  border-color: rgba(167, 137, 255, 0.27);
+  background: rgba(167, 137, 255, 0.07);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.location-privacy-note {
+  color: #918a97;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.location-status-note {
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: #506a2c;
+  background: rgba(201, 255, 98, 0.14);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+@media (max-width: 620px) {
+  .meeting-context-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .meeting-context-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
