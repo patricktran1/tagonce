@@ -4,6 +4,7 @@ import {
   ContactRound,
   Download,
   ExternalLink,
+  ImagePlus,
   MapPin,
   ScanLine,
   ShieldCheck,
@@ -82,7 +83,8 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
   const [memoryPhoto, setMemoryPhoto] = useState('');
   const [photoError, setPhotoError] = useState('');
   const [saved, setSaved] = useState(false);
-  const photoInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const socialEntries = useMemo(
     () => payload
@@ -112,13 +114,15 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
     }
   }
 
-  async function captureMemory(file: File | undefined) {
+  async function captureMemory(file: File | undefined, input?: HTMLInputElement | null) {
     if (!file) return;
     try {
       setMemoryPhoto(await compressImage(file));
       setPhotoError('');
     } catch (captureError) {
       setPhotoError(captureError instanceof Error ? captureError.message : 'The photo could not be saved.');
+    } finally {
+      if (input) input.value = '';
     }
   }
 
@@ -246,12 +250,42 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
               </div>
             </div>
 
-            <div className="memory-photo-stage">
-              {memoryPhoto ? <img src={memoryPhoto} alt="Memory with this contact" /> : <div><Camera size={28} /><strong>Optional photo together</strong><span>Capture the face and the moment, not just another username.</span></div>}
-              {memoryPhoto && <button className="photo-remove-button" onClick={() => setMemoryPhoto('')}><X size={15} /> Remove</button>}
+            {memoryPhoto && (
+              <div className="memory-photo-stage compact-memory-photo-stage">
+                <img src={memoryPhoto} alt="Memory with this contact" />
+                <button className="photo-remove-button" onClick={() => setMemoryPhoto('')}><X size={15} /> Remove</button>
+              </div>
+            )}
+
+            <input
+              ref={cameraInputRef}
+              className="hidden-file-input"
+              type="file"
+              accept="image/*"
+              capture="user"
+              onChange={(event) => captureMemory(event.target.files?.[0], event.currentTarget)}
+            />
+            <input
+              ref={uploadInputRef}
+              className="hidden-file-input"
+              type="file"
+              accept="image/*"
+              onChange={(event) => captureMemory(event.target.files?.[0], event.currentTarget)}
+            />
+
+            <button className="memory-camera-cta" onClick={() => cameraInputRef.current?.click()}>
+              <span className="memory-camera-icon"><Camera size={29} /></span>
+              <span>
+                <strong>{memoryPhoto ? 'Retake photo together' : 'Take a photo together'}</strong>
+                <small>Open the front camera and capture the moment.</small>
+              </span>
+            </button>
+            <div className="memory-upload-row">
+              <span>Already have a photo?</span>
+              <button className="text-button memory-upload-button" onClick={() => uploadInputRef.current?.click()}>
+                <ImagePlus size={15} /> Upload photo
+              </button>
             </div>
-            <input ref={photoInputRef} className="hidden-file-input" type="file" accept="image/*" capture="user" onChange={(event) => captureMemory(event.target.files?.[0])} />
-            <button className="button secondary full-button" onClick={() => photoInputRef.current?.click()}><Camera size={17} /> {memoryPhoto ? 'Retake photo' : 'Take a photo together'}</button>
             {photoError && <div className="inline-error">{photoError}</div>}
 
             <label className="field"><span>Where did you meet?</span><div className="input-with-icon"><MapPin size={16} /><input value={metAt} onChange={(event) => setMetAt(event.target.value)} placeholder="Event, venue or introduction" /></div></label>
