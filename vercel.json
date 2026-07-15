@@ -19,6 +19,28 @@
       ]
     }
   ],
+  "rewrites": [
+    {
+      "source": "/api/google-calendar/connect",
+      "destination": "/api/calendar-connect"
+    },
+    {
+      "source": "/api/google-calendar/status",
+      "destination": "/api/calendar-connect?action=status"
+    },
+    {
+      "source": "/api/google-calendar/active-event",
+      "destination": "/api/calendar-connect?action=events"
+    },
+    {
+      "source": "/api/google-calendar/disconnect",
+      "destination": "/api/calendar-connect?action=disconnect"
+    },
+    {
+      "source": "/api/google-calendar/callback",
+      "destination": "/api/calendar-callback"
+    }
+  ],
   "functions": {
     "api/generate.ts": {
       "maxDuration": 60
