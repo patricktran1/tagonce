@@ -1,17 +1,23 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   CALENDAR_SCOPE,
   STATE_COOKIE,
   getCalendarConfig,
-  json,
   randomState,
+  redirect,
+  sendJson,
   serializeCookie,
 } from './_shared';
 
-export function GET(request: Request) {
+export default function handler(request: VercelRequest, response: VercelResponse) {
+  if (request.method !== 'GET') {
+    return sendJson(response, { error: 'Method not allowed' }, 405);
+  }
+
   try {
     const config = getCalendarConfig(request);
     if (!config) {
-      return json({ error: 'Google Calendar OAuth is not configured.' }, 503);
+      return sendJson(response, { error: 'Google Calendar OAuth is not configured.' }, 503);
     }
 
     const state = randomState();
@@ -27,16 +33,14 @@ export function GET(request: Request) {
       state,
     }).toString();
 
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: authorizationUrl.toString(),
-        'Set-Cookie': serializeCookie(STATE_COOKIE, state, { maxAge: 600 }),
-        'Cache-Control': 'no-store',
-      },
-    });
+    return redirect(
+      response,
+      authorizationUrl.toString(),
+      [serializeCookie(STATE_COOKIE, state, { maxAge: 600 })],
+    );
   } catch (error) {
-    return json({
+    console.error('Google Calendar authorization start failed', error);
+    return sendJson(response, {
       error: error instanceof Error ? error.message : 'Google Calendar authorization could not start.',
     }, 500);
   }
