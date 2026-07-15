@@ -1,4 +1,9 @@
-const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events.readonly';
+const GOOGLE_SCOPES = [
+  'openid',
+  'email',
+  'profile',
+  'https://www.googleapis.com/auth/calendar.events.readonly',
+].join(' ');
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -83,7 +88,7 @@ export default {
       client_id: id,
       redirect_uri: redirectUri,
       response_type: 'code',
-      scope: CALENDAR_SCOPE,
+      scope: GOOGLE_SCOPES,
       access_type: 'offline',
       include_granted_scopes: 'true',
       prompt: 'consent',
