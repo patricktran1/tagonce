@@ -1,27 +1,32 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   SESSION_COOKIE,
   decryptSession,
   getCalendarConfig,
-  json,
   parseCookies,
+  sendJson,
 } from './_shared';
 
-export async function GET(request: Request) {
+export default function handler(request: VercelRequest, response: VercelResponse) {
+  if (request.method !== 'GET') {
+    return sendJson(response, { error: 'Method not allowed' }, 405);
+  }
+
   try {
     const config = getCalendarConfig(request);
-    if (!config) return json({ configured: false, connected: false });
+    if (!config) return sendJson(response, { configured: false, connected: false });
 
-    const session = await decryptSession(
+    const session = decryptSession(
       parseCookies(request).get(SESSION_COOKIE),
       config.sessionSecret,
     );
-    return json({
+    return sendJson(response, {
       configured: true,
       connected: Boolean(session),
       scope: session?.scope,
     });
   } catch (error) {
     console.error('Google Calendar status failed', error);
-    return json({ configured: true, connected: false }, 200);
+    return sendJson(response, { configured: true, connected: false }, 200);
   }
 }
