@@ -3,7 +3,7 @@ import {
   Check,
   ContactRound,
   Download,
-  Link2,
+  ExternalLink,
   MapPin,
   ScanLine,
   ShieldCheck,
@@ -18,7 +18,18 @@ import {
   downloadVCard,
   extractCardToken,
 } from '../lib/cardExchange';
-import type { MentionEntity, Platform, PlatformMapping, ShareCardPayload } from '../types';
+import {
+  isPublishingPlatform,
+  socialPlatformMeta,
+  socialProfileUrl,
+} from '../data/socials';
+import type {
+  MentionEntity,
+  PlatformMapping,
+  ShareCardPayload,
+  SharedSocialIdentity,
+  SocialPlatform,
+} from '../types';
 import { PlatformMark } from './PlatformMark';
 
 interface ScanPageProps {
@@ -55,6 +66,12 @@ function initialsFor(name: string) {
     .join('') || 'TO';
 }
 
+function cardContext(payload: ShareCardPayload) {
+  if (payload.mode === 'event') return payload.eventName || 'Event connection';
+  if (payload.mode === 'custom') return payload.eventName || 'Custom connection';
+  return 'Personal connection';
+}
+
 export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
   const [initial] = useState(getInitialScanState);
   const [input, setInput] = useState(initial.input);
@@ -69,7 +86,7 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
 
   const socialEntries = useMemo(
     () => payload
-      ? (Object.entries(payload.socials) as Array<[Platform, { handle?: string; profileUrl?: string }]>)
+      ? (Object.entries(payload.socials) as Array<[SocialPlatform, SharedSocialIdentity]>)
       : [],
     [payload],
   );
@@ -109,6 +126,7 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
     if (!payload || expired) return;
     const mappings: MentionEntity['mappings'] = {};
     socialEntries.forEach(([platform, identity]) => {
+      if (!isPublishingPlatform(platform)) return;
       const mapping: PlatformMapping = {
         platform,
         displayName: payload.profile.displayName,
@@ -136,6 +154,7 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
       notes,
       memoryPhotoDataUrl: memoryPhoto || undefined,
       sourceCardMode: payload.mode,
+      socialProfiles: payload.socials,
       initials: initialsFor(payload.profile.displayName),
       mappings,
       usageCount: 0,
@@ -189,7 +208,7 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
               <span className="received-avatar">{initialsFor(payload.profile.displayName)}</span>
               <button className="icon-button" onClick={clearCard} aria-label="Close card"><X size={18} /></button>
             </div>
-            <span className="eyebrow">{payload.mode === 'event' ? payload.eventName || 'Event connection' : 'Personal connection'}</span>
+            <span className="eyebrow">{cardContext(payload)}</span>
             <h2>{payload.profile.displayName}</h2>
             <p>{[payload.profile.title, payload.profile.company].filter(Boolean).join(' · ')}</p>
 
@@ -203,16 +222,20 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
             </div>
 
             <div className="received-socials">
-              {socialEntries.map(([platform, identity]) => (
-                <a href={identity.profileUrl || undefined} target={identity.profileUrl ? '_blank' : undefined} rel="noreferrer" key={platform}>
-                  <PlatformMark platform={platform} />
-                  <span><strong>{platform}</strong><small>{identity.handle || identity.profileUrl || 'Shared identity'}</small></span>
-                  <Link2 size={15} />
-                </a>
-              ))}
+              {socialEntries.map(([platform, identity]) => {
+                const meta = socialPlatformMeta[platform];
+                const url = socialProfileUrl(platform, identity);
+                return (
+                  <a href={url} target="_blank" rel="noreferrer" key={platform}>
+                    <PlatformMark platform={platform} />
+                    <span><strong>{meta.label}</strong><small>{identity.handle || identity.profileUrl || 'Shared profile'}</small></span>
+                    <span className="received-social-action">{meta.action}<ExternalLink size={13} /></span>
+                  </a>
+                );
+              })}
             </div>
 
-            <button className="button secondary full-button" onClick={() => downloadVCard(payload)}><Download size={17} /> Save to phone contacts</button>
+            <button className="button secondary full-button" onClick={() => downloadVCard(payload)}><Download size={17} /> Save complete vCard</button>
           </section>
 
           <section className="panel memory-capture-panel">
