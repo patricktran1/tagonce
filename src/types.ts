@@ -7,6 +7,12 @@ export type Platform =
   | 'tiktok'
   | 'youtube';
 
+export type SocialPlatform =
+  | Platform
+  | 'snapchat'
+  | 'pinterest'
+  | 'github';
+
 export type EntityType = 'person' | 'company' | 'brand' | 'organization';
 export type CardMode = 'event' | 'personal' | 'custom';
 export type ShareFieldKey =
@@ -17,7 +23,7 @@ export type ShareFieldKey =
   | 'whatsapp'
   | 'website'
   | 'eventName'
-  | `social:${Platform}`;
+  | `social:${SocialPlatform}`;
 
 export type ResolutionStatus =
   | 'resolved'
@@ -27,6 +33,11 @@ export type ResolutionStatus =
 
 export type GenerationSource = 'ai' | 'rules';
 export type ConnectionMethod = 'manual' | 'oauth';
+
+export interface SharedSocialIdentity {
+  handle?: string;
+  profileUrl?: string;
+}
 
 export interface PlatformMapping {
   platform: Platform;
@@ -54,6 +65,7 @@ export interface MentionEntity {
   notes?: string;
   memoryPhotoDataUrl?: string;
   sourceCardMode?: CardMode;
+  socialProfiles?: Partial<Record<SocialPlatform, SharedSocialIdentity>>;
   initials: string;
   mappings: Partial<Record<Platform, PlatformMapping>>;
   usageCount: number;
@@ -131,12 +143,8 @@ export interface MyProfile {
   website: string;
   eventName: string;
   eventEndsAt: string;
+  socialProfiles?: Partial<Record<SocialPlatform, SharedSocialIdentity>>;
   cardSelections?: Partial<Record<CardMode, ShareFieldKey[]>>;
-}
-
-export interface SharedSocialIdentity {
-  handle?: string;
-  profileUrl?: string;
 }
 
 export interface ShareCardPayload {
@@ -154,5 +162,5 @@ export interface ShareCardPayload {
     whatsapp?: string;
     website?: string;
   };
-  socials: Partial<Record<Platform, SharedSocialIdentity>>;
+  socials: Partial<Record<SocialPlatform, SharedSocialIdentity>>;
 }
