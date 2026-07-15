@@ -18,6 +18,7 @@ import {
   type CalendarEventSuggestion,
 } from '../lib/calendarService';
 import type { MyProfile } from '../types';
+import { GoogleSsoButton } from './GoogleSsoButton';
 
 interface EventCardLauncherProps {
   profile: MyProfile;
@@ -43,6 +44,10 @@ const oauthResultMessages: Record<string, string> = {
   session_error: 'Google approved access, but TagOnce could not create the encrypted Calendar session.',
   google_error: 'Google returned an authorization error. Start the connection again.',
   unconfigured: 'The TagOnce deployment is missing one or more Google Calendar environment variables.',
+  sso_csrf: 'Google Sign-In returned without a valid security token. Reload TagOnce and try the Google button again.',
+  sso_response: 'Google Sign-In returned an incomplete account response. Reload and try again.',
+  sso_email: 'Google did not return a verified email for that account. Use the email fallback below.',
+  sso_token: 'TagOnce could not verify the Google Sign-In response. Reload and try again.',
 };
 
 function eventTimeLabel(event: CalendarEventSuggestion) {
@@ -71,6 +76,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [googleEmail, setGoogleEmail] = useState(profile.email || '');
+  const [showEmailFallback, setShowEmailFallback] = useState(false);
 
   async function loadEvents() {
     setLoading(true);
@@ -137,10 +143,15 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     return () => { cancelled = true; };
   }, []);
 
-  function connect(useEmailHint: boolean) {
+  function connectWithEmail() {
     setState('connecting');
     setError('');
-    connectGoogleCalendar('event', useEmailHint ? googleEmail : '');
+    connectGoogleCalendar('event', googleEmail);
+  }
+
+  function beginGoogleSso() {
+    setState('connecting');
+    setError('');
   }
 
   async function disconnect() {
@@ -197,7 +208,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
 
         {(state === 'checking' || state === 'connecting' || loading) && (
           <div className="live-event-loading"><Loader2 className="spin" size={19} />
-            {state === 'connecting' ? 'Taking you to Google Calendar…' : 'Checking your calendar…'}
+            {state === 'connecting' ? 'Taking you to Google…' : 'Checking your calendar…'}
           </div>
         )}
 
@@ -216,31 +227,43 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
             <span className="calendar-detection-icon"><CalendarCheck size={22} /></span>
             <div>
               <h3>Connect Google Calendar</h3>
-              <p>Read-only access. Entering your Google email skips the account chooser when Safari gets stuck there.</p>
-              <div className="calendar-account-connect">
-                <label htmlFor="calendar-google-email">Google account email</label>
-                <div className="calendar-account-row">
-                  <input
-                    id="calendar-google-email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@gmail.com"
-                    value={googleEmail}
-                    onChange={(event) => setGoogleEmail(event.target.value)}
-                  />
-                  <button
-                    className="button primary"
-                    disabled={!validEmail(googleEmail)}
-                    onClick={() => connect(true)}
-                  >
-                    <CalendarCheck size={17} /> Continue
-                  </button>
-                </div>
-                <span className="calendar-account-help">Used only to tell Google which signed-in account to open. TagOnce does not store it separately.</span>
-                <button className="text-button calendar-choose-account" onClick={() => connect(false)}>
-                  Choose from signed-in accounts instead
-                </button>
+              <p>Choose your Google account, then approve read-only access to event titles, times and locations.</p>
+              <div className="google-calendar-primary-connect">
+                <GoogleSsoButton onStart={beginGoogleSso} />
+                <span>TagOnce cannot edit your calendar.</span>
               </div>
+
+              <button
+                className="text-button calendar-fallback-toggle"
+                type="button"
+                onClick={() => setShowEmailFallback((current) => !current)}
+              >
+                {showEmailFallback ? 'Hide email fallback' : 'Having trouble? Use email instead'}
+              </button>
+
+              {showEmailFallback && (
+                <div className="calendar-account-connect calendar-email-fallback">
+                  <label htmlFor="calendar-google-email">Google account email</label>
+                  <div className="calendar-account-row">
+                    <input
+                      id="calendar-google-email"
+                      type="email"
+                      autoComplete="email"
+                      placeholder="you@gmail.com"
+                      value={googleEmail}
+                      onChange={(event) => setGoogleEmail(event.target.value)}
+                    />
+                    <button
+                      className="button primary"
+                      disabled={!validEmail(googleEmail)}
+                      onClick={connectWithEmail}
+                    >
+                      <CalendarCheck size={17} /> Continue
+                    </button>
+                  </div>
+                  <span className="calendar-account-help">Used only to tell Google which signed-in account to open.</span>
+                </div>
+              )}
             </div>
           </div>
         )}
