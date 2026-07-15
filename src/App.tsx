@@ -10,6 +10,7 @@ import './release08.css';
 import './release09.css';
 import './release10.css';
 import './release11.css';
+import './release12.css';
 import { AddressBookPage } from './components/AddressBookPage';
 import { CampaignsPage } from './components/CampaignsPage';
 import { CampaignComposer } from './components/CampaignComposer';
