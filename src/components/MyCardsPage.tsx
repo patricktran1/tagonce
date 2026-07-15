@@ -57,7 +57,7 @@ const defaultSelections: Record<CardMode, ShareFieldKey[]> = {
 };
 
 const detailOptions: Array<{
-  key: Exclude<ShareFieldKey, `social:${Platform}`>;
+  key: 'title' | 'company' | 'email' | 'phone' | 'whatsapp' | 'website';
   label: string;
   description: string;
 }> = [
@@ -87,14 +87,26 @@ const modeMeta: Record<CardMode, { label: string; access: string; description: s
   },
 };
 
+function profileFieldValue(profile: MyProfile, key: ShareFieldKey) {
+  switch (key) {
+    case 'title': return profile.title;
+    case 'company': return profile.company;
+    case 'email': return profile.email;
+    case 'phone': return profile.phone;
+    case 'whatsapp': return profile.whatsapp;
+    case 'website': return profile.website;
+    case 'eventName': return profile.eventName;
+    default: return '';
+  }
+}
+
 function hasValue(profile: MyProfile, key: ShareFieldKey, connectionMap: Map<Platform, SocialConnection>) {
   if (key.startsWith('social:')) {
     const platform = key.slice('social:'.length) as Platform;
     const connection = connectionMap.get(platform);
     return Boolean(connection?.handle?.trim() || connection?.profileUrl?.trim());
   }
-  if (key === 'eventName') return Boolean(profile.eventName.trim());
-  return Boolean(profile[key].trim());
+  return Boolean(profileFieldValue(profile, key).trim());
 }
 
 export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps) {
