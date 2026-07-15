@@ -22,7 +22,7 @@
   "rewrites": [
     {
       "source": "/api/google-calendar/connect",
-      "destination": "/api/calendar-connect"
+      "destination": "/api/calendar-oauth-start"
     },
     {
       "source": "/api/google-calendar/status",
@@ -38,7 +38,7 @@
     },
     {
       "source": "/api/google-calendar/callback",
-      "destination": "/api/calendar-callback"
+      "destination": "/api/calendar-oauth-callback"
     }
   ],
   "functions": {
