@@ -5,6 +5,7 @@ import './release03.css';
 import './release04.css';
 import './release05.css';
 import './release06.css';
+import './release07.css';
 import { AddressBookPage } from './components/AddressBookPage';
 import { CampaignsPage } from './components/CampaignsPage';
 import { CampaignComposer } from './components/CampaignComposer';
@@ -59,6 +60,7 @@ const defaultProfile: MyProfile = {
       'social:linkedin',
       'social:instagram',
       'social:facebook',
+      'social:x',
     ],
     custom: ['email', 'social:linkedin'],
   },
@@ -78,13 +80,15 @@ const pageMeta: Record<PageKey, { title: string; eyebrow: string }> = {
 function identitiesMatch(left: MentionEntity, right: MentionEntity) {
   if (left.displayName.trim().toLowerCase() === right.displayName.trim().toLowerCase()) return true;
   const leftUrls = new Set(
-    Object.values(left.mappings)
-      .map((mapping) => mapping?.profileUrl)
-      .filter((value): value is string => Boolean(value)),
+    [
+      ...Object.values(left.mappings).map((mapping) => mapping?.profileUrl),
+      ...Object.values(left.socialProfiles ?? {}).map((profile) => profile?.profileUrl),
+    ].filter((value): value is string => Boolean(value)),
   );
-  return Object.values(right.mappings).some(
-    (mapping) => Boolean(mapping?.profileUrl && leftUrls.has(mapping.profileUrl)),
-  );
+  return [
+    ...Object.values(right.mappings).map((mapping) => mapping?.profileUrl),
+    ...Object.values(right.socialProfiles ?? {}).map((profile) => profile?.profileUrl),
+  ].some((profileUrl) => Boolean(profileUrl && leftUrls.has(profileUrl)));
 }
 
 export default function App() {
@@ -138,6 +142,7 @@ export default function App() {
         metOn: incoming.metOn || existing.metOn,
         notes: [existing.notes, incoming.notes].filter(Boolean).join('\n') || undefined,
         memoryPhotoDataUrl: incoming.memoryPhotoDataUrl || existing.memoryPhotoDataUrl,
+        socialProfiles: { ...existing.socialProfiles, ...incoming.socialProfiles },
         mappings: { ...existing.mappings, ...incoming.mappings },
       };
       return current.map((entity, index) => (index === existingIndex ? merged : entity));
