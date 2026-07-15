@@ -114,9 +114,10 @@ async function verifySignedState(value: string | null, secret: string) {
   }
 }
 
-function redirect(request: Request, result: string, cookies: string[] = []) {
+function redirect(request: Request, result: string, cookies: string[] = [], googleAccount = '') {
   const destination = new URL('/', request.url);
   destination.searchParams.set('calendar', result);
+  if (googleAccount) destination.searchParams.set('google_account', googleAccount);
   const headers = new Headers({
     Location: destination.toString(),
     'Cache-Control': 'no-store',
@@ -200,7 +201,7 @@ export default {
       const sessionValue = await encryptSession(session, appConfig.sessionSecret);
       return redirect(request, 'connected', [
         cookie(SESSION_COOKIE, sessionValue, 60 * 60 * 24 * 180),
-      ]);
+      ], email);
     } catch (identityError) {
       console.error('Google identity verification failed', identityError);
       return redirect(request, 'identity_token');
