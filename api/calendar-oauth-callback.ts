@@ -14,8 +14,12 @@ type GoogleTokenResponse = {
   error_description?: string;
 };
 
+type SignedStatePayload = {
+  issuedAt?: number;
+  nonce?: string;
+};
+
 const SESSION_COOKIE = 'tagonce_calendar_session';
-const STATE_COOKIE = 'tagonce_calendar_state';
 
 function config(request: Request) {
   const clientId = (
@@ -30,30 +34,8 @@ function config(request: Request) {
   return { clientId, clientSecret, sessionSecret, redirectUri };
 }
 
-function parseCookies(request: Request) {
-  const values = new Map<string, string>();
-  const header = request.headers.get('cookie') || '';
-  header.split(';').forEach((part) => {
-    const separator = part.indexOf('=');
-    if (separator < 0) return;
-    const name = part.slice(0, separator).trim();
-    const value = part.slice(separator + 1).trim();
-    if (!name) return;
-    try {
-      values.set(name, decodeURIComponent(value));
-    } catch {
-      values.set(name, value);
-    }
-  });
-  return values;
-}
-
 function cookie(name: string, value: string, maxAge: number) {
   return `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${Math.max(0, Math.floor(maxAge))}; HttpOnly; Secure; SameSite=Lax`;
-}
-
-function clearCookie(name: string) {
-  return cookie(name, '', 0);
 }
 
 function base64UrlEncode(bytes: Uint8Array) {
@@ -62,6 +44,15 @@ function base64UrlEncode(bytes: Uint8Array) {
     binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
   }
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function base64UrlDecode(value: string) {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
 }
 
 async function encryptionKey(secret: string) {
@@ -83,6 +74,39 @@ async function encryptSession(session: CalendarSession, secret: string) {
   return base64UrlEncode(packed);
 }
 
+async function hmacKey(secret: string) {
+  return crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['verify'],
+  );
+}
+
+async function verifySignedState(value: string | null, secret: string) {
+  if (!value) return false;
+  const [payload, signature] = value.split('.');
+  if (!payload || !signature) return false;
+
+  try {
+    const validSignature = await crypto.subtle.verify(
+      'HMAC',
+      await hmacKey(secret),
+      base64UrlDecode(signature),
+      new TextEncoder().encode(payload),
+    );
+    if (!validSignature) return false;
+
+    const decoded = new TextDecoder().decode(base64UrlDecode(payload));
+    const parsed = JSON.parse(decoded) as SignedStatePayload;
+    const age = Date.now() - Number(parsed.issuedAt || 0);
+    return Boolean(parsed.nonce && age >= 0 && age <= 15 * 60 * 1000);
+  } catch {
+    return false;
+  }
+}
+
 function redirect(request: Request, result: string, cookies: string[] = []) {
   const destination = new URL('/', request.url);
   destination.searchParams.set('calendar', result);
@@ -94,6 +118,14 @@ function redirect(request: Request, result: string, cookies: string[] = []) {
   return new Response(null, { status: 302, headers });
 }
 
+function tokenFailureCode(token: GoogleTokenResponse) {
+  if (token.error === 'invalid_client') return 'client_credentials';
+  if (token.error === 'redirect_uri_mismatch') return 'redirect_mismatch';
+  if (token.error === 'invalid_grant') return 'authorization_expired';
+  if (token.error === 'access_denied') return 'cancelled';
+  return 'token_exchange';
+}
+
 export default {
   async fetch(request: Request) {
     if (request.method !== 'GET') {
@@ -101,23 +133,22 @@ export default {
     }
 
     const appConfig = config(request);
-    const cookies = parseCookies(request);
-    const cleanup = [clearCookie(STATE_COOKIE)];
-    if (!appConfig) return redirect(request, 'unconfigured', cleanup);
+    if (!appConfig) return redirect(request, 'unconfigured');
 
     const url = new URL(request.url);
     const error = url.searchParams.get('error');
     const state = url.searchParams.get('state');
     const code = url.searchParams.get('code');
-    const expectedState = cookies.get(STATE_COOKIE);
 
     if (error) {
-      return redirect(request, error === 'access_denied' ? 'cancelled' : 'error', cleanup);
+      return redirect(request, error === 'access_denied' ? 'cancelled' : 'google_error');
     }
-    if (!state || !expectedState || state !== expectedState || !code) {
-      return redirect(request, 'invalid_state', cleanup);
+    if (!code) return redirect(request, 'authorization_incomplete');
+    if (!(await verifySignedState(state, appConfig.sessionSecret))) {
+      return redirect(request, 'invalid_state');
     }
 
+    let token: GoogleTokenResponse;
     try {
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -130,11 +161,21 @@ export default {
           grant_type: 'authorization_code',
         }),
       });
-      const token = await tokenResponse.json().catch(() => ({})) as GoogleTokenResponse;
+      token = await tokenResponse.json().catch(() => ({})) as GoogleTokenResponse;
       if (!tokenResponse.ok || !token.access_token) {
-        throw new Error(token.error_description || token.error || 'Google token exchange failed.');
+        console.error('Google Calendar token exchange failed', {
+          status: tokenResponse.status,
+          error: token.error,
+          description: token.error_description,
+        });
+        return redirect(request, tokenFailureCode(token));
       }
+    } catch (tokenError) {
+      console.error('Google Calendar token request failed', tokenError);
+      return redirect(request, 'token_exchange');
+    }
 
+    try {
       const session: CalendarSession = {
         accessToken: token.access_token,
         refreshToken: token.refresh_token,
@@ -144,11 +185,10 @@ export default {
       const sessionValue = await encryptSession(session, appConfig.sessionSecret);
       return redirect(request, 'connected', [
         cookie(SESSION_COOKIE, sessionValue, 60 * 60 * 24 * 180),
-        ...cleanup,
       ]);
-    } catch (tokenError) {
-      console.error('Google Calendar callback failed', tokenError);
-      return redirect(request, 'error', cleanup);
+    } catch (sessionError) {
+      console.error('Google Calendar session creation failed', sessionError);
+      return redirect(request, 'session_error');
     }
   },
 };
