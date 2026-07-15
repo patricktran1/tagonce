@@ -1,16 +1,16 @@
 import clsx from 'clsx';
-import { platformMeta } from '../data/demo';
-import type { Platform } from '../types';
+import { socialPlatformMeta } from '../data/socials';
+import type { SocialPlatform } from '../types';
 
 interface PlatformMarkProps {
-  platform: Platform;
+  platform: SocialPlatform;
   size?: 'sm' | 'md';
 }
 
 export function PlatformMark({ platform, size = 'md' }: PlatformMarkProps) {
   return (
     <span className={clsx('platform-mark', `platform-${platform}`, `platform-mark-${size}`)}>
-      {platformMeta[platform].short}
+      {socialPlatformMeta[platform].short}
     </span>
   );
 }
