@@ -1,48 +1,60 @@
-# Google Calendar OAuth setup
+# Google Calendar setup
 
-TagOnce uses server-side Google OAuth with the read-only Calendar Events scope. Calendar tokens are encrypted into an HTTP-only cookie and are never written to browser storage.
+TagOnce uses Google Identity Services in the browser with the read-only Calendar Events scope. It does not use a Calendar serverless function, client secret, redirect callback, or refresh token.
 
-## 1. Create a Google Cloud project
+## 1. Google Cloud project
 
 1. Open Google Cloud Console.
-2. Create or select a project for TagOnce.
+2. Create or select the TagOnce project.
 3. Enable **Google Calendar API**.
 4. Configure the OAuth consent screen.
 5. During testing, add your Google account under **Test users**.
+6. Add this scope under **Data access**:
 
-## 2. Create an OAuth client
+```text
+https://www.googleapis.com/auth/calendar.events.readonly
+```
+
+## 2. OAuth client
 
 Create an OAuth client with application type **Web application**.
 
-Add this authorized redirect URI using the exact public TagOnce domain:
+Add the production TagOnce origin under **Authorized JavaScript origins**:
 
 ```text
-https://YOUR-TAGONCE-DOMAIN/api/google-calendar/callback
+https://tagonce.vercel.app
 ```
 
-The protocol, host, path, and trailing slash must match exactly.
+Do not add a path or trailing slash to the JavaScript origin.
 
-## 3. Add Vercel environment variables
+The former `/api/google-calendar/callback` redirect URI is no longer used by TagOnce and can be removed.
 
-In the TagOnce Vercel project, add these variables for Production and Preview as appropriate:
+## 3. Client ID
+
+The Google OAuth Client ID is a public browser identifier, not a secret. There are two supported options.
+
+### Production option
+
+Add this Vercel environment variable and redeploy:
 
 ```text
-GOOGLE_CALENDAR_CLIENT_ID=your-google-oauth-client-id
-GOOGLE_CALENDAR_CLIENT_SECRET=your-google-oauth-client-secret
-GOOGLE_CALENDAR_REDIRECT_URI=https://YOUR-TAGONCE-DOMAIN/api/google-calendar/callback
-CALENDAR_SESSION_SECRET=generate-a-long-random-secret
+VITE_GOOGLE_CALENDAR_CLIENT_ID=your-client-id.apps.googleusercontent.com
 ```
 
-Generate `CALENDAR_SESSION_SECRET` with a password manager or a command such as:
+### Immediate testing option
 
-```bash
-openssl rand -base64 48
-```
+Press **Connect calendar** in TagOnce and paste the OAuth Client ID when prompted. TagOnce stores that public client ID in the browser for future visits.
 
-Do not commit real secrets to GitHub.
+Do not paste or expose the Google client secret. TagOnce does not need it for this browser authorization flow.
 
-## 4. Redeploy
+## 4. Test
 
-Redeploy TagOnce after saving the environment variables. Scan a TagOnce card, open **Where did you meet?**, and choose **Connect Google Calendar**.
+1. Create a timed event in the primary Google Calendar that is happening now or begins within three hours.
+2. Give it a title and location.
+3. Open **Live event** in TagOnce.
+4. Connect Google Calendar and approve read-only event access.
+5. Select **Make this my Event QR**.
 
-The app searches the primary calendar for events that are happening now, starting within three hours, or ended within two hours. It suggests up to three matches and never overwrites the meeting field until the user selects one.
+TagOnce searches the primary calendar for events happening now, starting within three hours, ending within the last two hours, or occurring today. It ranks title matches and events with locations higher.
+
+The browser access token is short-lived. TagOnce may ask the user to reconnect after it expires.
