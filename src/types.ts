@@ -8,6 +8,7 @@ export type Platform =
   | 'youtube';
 
 export type EntityType = 'person' | 'company' | 'brand' | 'organization';
+export type CardMode = 'event' | 'personal';
 
 export type ResolutionStatus =
   | 'resolved'
@@ -33,7 +34,17 @@ export interface MentionEntity {
   displayName: string;
   type: EntityType;
   description?: string;
+  title?: string;
+  company?: string;
+  email?: string;
+  phone?: string;
+  whatsapp?: string;
   website?: string;
+  metAt?: string;
+  metOn?: string;
+  notes?: string;
+  memoryPhotoDataUrl?: string;
+  sourceCardMode?: CardMode;
   initials: string;
   mappings: Partial<Record<Platform, PlatformMapping>>;
   usageCount: number;
@@ -99,4 +110,39 @@ export interface SocialConnection {
   platformId?: string;
   connectionMethod?: ConnectionMethod;
   lastCheckedAt?: string;
+}
+
+export interface MyProfile {
+  displayName: string;
+  title: string;
+  company: string;
+  email: string;
+  phone: string;
+  whatsapp: string;
+  website: string;
+  eventName: string;
+  eventEndsAt: string;
+}
+
+export interface SharedSocialIdentity {
+  handle?: string;
+  profileUrl?: string;
+}
+
+export interface ShareCardPayload {
+  version: 1;
+  mode: CardMode;
+  createdAt: string;
+  expiresAt?: string;
+  eventName?: string;
+  profile: {
+    displayName: string;
+    title?: string;
+    company?: string;
+    email?: string;
+    phone?: string;
+    whatsapp?: string;
+    website?: string;
+  };
+  socials: Partial<Record<Platform, SharedSocialIdentity>>;
 }
