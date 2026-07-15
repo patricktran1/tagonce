@@ -1,0 +1,64 @@
+/* Release 0.12: official Google Sign-In as the primary Calendar connection */
+.google-calendar-primary-connect {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 380px);
+  margin: 4px 0 12px;
+}
+
+.google-calendar-primary-connect > span {
+  color: #8a828f;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.google-sso-control {
+  position: relative;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.google-sso-button-host {
+  width: min(100%, 340px);
+  min-height: 44px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.google-sso-button-host > div,
+.google-sso-button-host iframe {
+  max-width: 100% !important;
+}
+
+.google-sso-loading,
+.google-sso-error {
+  color: #837b88;
+  font-size: 12px;
+}
+
+.google-sso-error {
+  padding: 10px 12px;
+  border: 1px solid #ead7d9;
+  border-radius: 10px;
+  background: #fff6f6;
+  color: #a23c47;
+}
+
+.calendar-fallback-toggle {
+  justify-self: start;
+  margin-top: 2px;
+}
+
+.calendar-email-fallback {
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid #e6dfea;
+}
+
+@media (max-width: 620px) {
+  .google-calendar-primary-connect,
+  .google-sso-button-host {
+    width: 100%;
+  }
+}
