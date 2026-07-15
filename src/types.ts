@@ -8,7 +8,16 @@ export type Platform =
   | 'youtube';
 
 export type EntityType = 'person' | 'company' | 'brand' | 'organization';
-export type CardMode = 'event' | 'personal';
+export type CardMode = 'event' | 'personal' | 'custom';
+export type ShareFieldKey =
+  | 'title'
+  | 'company'
+  | 'email'
+  | 'phone'
+  | 'whatsapp'
+  | 'website'
+  | 'eventName'
+  | `social:${Platform}`;
 
 export type ResolutionStatus =
   | 'resolved'
@@ -122,6 +131,7 @@ export interface MyProfile {
   website: string;
   eventName: string;
   eventEndsAt: string;
+  cardSelections?: Partial<Record<CardMode, ShareFieldKey[]>>;
 }
 
 export interface SharedSocialIdentity {
