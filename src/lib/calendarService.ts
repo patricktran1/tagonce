@@ -57,6 +57,17 @@ export function restoreGoogleCalendarReturn() {
   }
 }
 
+export function rememberGoogleCalendarReturn(returnView?: unknown) {
+  const returnTo = returnView === 'event'
+    ? '/?view=event'
+    : `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  try {
+    window.sessionStorage.setItem(CALENDAR_RETURN_KEY, returnTo);
+  } catch {
+    // OAuth still works; only the exact SPA return target may be unavailable.
+  }
+}
+
 export async function getCalendarStatus() {
   const { response, payload } = await readJson<CalendarStatusResponse>(
     await fetch('/api/google-calendar/status', {
@@ -86,14 +97,7 @@ export async function getCalendarEventSuggestions(eventName = '') {
 }
 
 export function connectGoogleCalendar(returnView?: unknown, loginHint = '') {
-  const returnTo = returnView === 'event'
-    ? '/?view=event'
-    : `${window.location.pathname}${window.location.search}${window.location.hash}`;
-  try {
-    window.sessionStorage.setItem(CALENDAR_RETURN_KEY, returnTo);
-  } catch {
-    // OAuth still works; only the exact SPA return target may be unavailable.
-  }
+  rememberGoogleCalendarReturn(returnView);
 
   const target = new URL('/api/google-calendar/connect', window.location.origin);
   const normalizedHint = loginHint.trim();
