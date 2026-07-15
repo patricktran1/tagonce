@@ -26,16 +26,42 @@ interface CalendarEventResponse extends CalendarStatusResponse {
 }
 
 const CALENDAR_RETURN_KEY = 'tagonce.calendar.return.v2';
+const GOOGLE_ACCOUNT_KEY = 'tagonce.google.calendar.account.v1';
+
+function validEmail(value = '') {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
 
 async function readJson<T>(response: Response) {
   const payload = await response.json().catch(() => ({})) as T;
   return { response, payload };
 }
 
+export function getRememberedGoogleCalendarAccount() {
+  if (typeof window === 'undefined') return '';
+  try {
+    const value = window.localStorage.getItem(GOOGLE_ACCOUNT_KEY) || '';
+    return validEmail(value) ? value : '';
+  } catch {
+    return '';
+  }
+}
+
+export function rememberGoogleCalendarAccount(email: string) {
+  if (typeof window === 'undefined' || !validEmail(email)) return;
+  try {
+    window.localStorage.setItem(GOOGLE_ACCOUNT_KEY, email.trim().toLowerCase());
+  } catch {
+    // Calendar OAuth still works when local storage is unavailable.
+  }
+}
+
 export function restoreGoogleCalendarReturn() {
   if (typeof window === 'undefined') return;
   const current = new URL(window.location.href);
   const result = current.searchParams.get('calendar');
+  const verifiedGoogleAccount = current.searchParams.get('google_account') || '';
+  if (verifiedGoogleAccount) rememberGoogleCalendarAccount(verifiedGoogleAccount);
   if (!result) return;
 
   let saved = '';
@@ -46,7 +72,12 @@ export function restoreGoogleCalendarReturn() {
     // The callback can still open the Live Event page without session storage.
   }
 
-  if (!saved) return;
+  if (!saved) {
+    current.searchParams.delete('google_account');
+    window.history.replaceState({}, '', `${current.pathname}${current.search}${current.hash}`);
+    return;
+  }
+
   try {
     const target = new URL(saved, window.location.origin);
     if (target.origin !== window.location.origin) return;
