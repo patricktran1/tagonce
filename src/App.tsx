@@ -22,6 +22,7 @@ import { ScanPage } from './components/ScanPage';
 import { SettingsPage } from './components/SettingsPage';
 import { Sidebar, type PageKey } from './components/Sidebar';
 import { defaultBrandSettings, demoEntities } from './data/demo';
+import { restoreGoogleCalendarReturn } from './lib/calendarService';
 import { loadLocal, saveLocal } from './lib/storage';
 import type {
   BrandSettings,
@@ -30,6 +31,8 @@ import type {
   MyProfile,
   SocialConnection,
 } from './types';
+
+restoreGoogleCalendarReturn();
 
 const ENTITY_KEY = 'tagonce.entities.v1';
 const CAMPAIGN_KEY = 'tagonce.campaigns.v1';
@@ -94,10 +97,15 @@ function identitiesMatch(left: MentionEntity, right: MentionEntity) {
   );
 }
 
+function initialPage(): PageKey {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('card')) return 'scan';
+  if (params.get('view') === 'event' || params.has('calendar')) return 'event';
+  return 'dashboard';
+}
+
 export default function App() {
-  const [activePage, setActivePage] = useState<PageKey>(() =>
-    new URLSearchParams(window.location.search).has('card') ? 'scan' : 'dashboard',
-  );
+  const [activePage, setActivePage] = useState<PageKey>(initialPage);
   const [entities, setEntities] = useState<MentionEntity[]>(() => loadLocal(ENTITY_KEY, demoEntities));
   const [campaigns, setCampaigns] = useState<Campaign[]>(() => loadLocal(CAMPAIGN_KEY, []));
   const [brand, setBrand] = useState<BrandSettings>(() => loadLocal(BRAND_KEY, defaultBrandSettings));
