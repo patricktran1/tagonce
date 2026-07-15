@@ -85,7 +85,7 @@ export async function getCalendarEventSuggestions(eventName = '') {
   return payload;
 }
 
-export function connectGoogleCalendar(returnView?: unknown) {
+export function connectGoogleCalendar(returnView?: unknown, loginHint = '') {
   const returnTo = returnView === 'event'
     ? '/?view=event'
     : `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -94,7 +94,11 @@ export function connectGoogleCalendar(returnView?: unknown) {
   } catch {
     // OAuth still works; only the exact SPA return target may be unavailable.
   }
-  window.location.assign('/api/google-calendar/connect');
+
+  const target = new URL('/api/google-calendar/connect', window.location.origin);
+  const normalizedHint = loginHint.trim();
+  if (normalizedHint) target.searchParams.set('login_hint', normalizedHint);
+  window.location.assign(`${target.pathname}${target.search}`);
 }
 
 export async function disconnectGoogleCalendar() {
