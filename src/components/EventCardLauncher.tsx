@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
-  authorizeGoogleCalendar,
+  connectGoogleCalendar,
   disconnectGoogleCalendar,
   getCalendarEventSuggestions,
   getCalendarStatus,
@@ -83,34 +83,39 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
   useEffect(() => {
     let cancelled = false;
     async function initialize() {
-      const status = await getCalendarStatus();
-      if (cancelled) return;
-      if (!status.configured) {
-        setState('unconfigured');
-        return;
+      const oauthResult = new URLSearchParams(window.location.search).get('calendar');
+      if (oauthResult === 'cancelled') setError('Google Calendar connection was cancelled.');
+      if (oauthResult && !['connected', 'cancelled'].includes(oauthResult)) {
+        setError('Google Calendar could not be connected. Check the OAuth redirect setup and try again.');
       }
-      if (!status.connected) {
-        setState('disconnected');
-        return;
+
+      try {
+        const status = await getCalendarStatus();
+        if (cancelled) return;
+        if (!status.configured) {
+          setState('unconfigured');
+          return;
+        }
+        if (!status.connected) {
+          setState('disconnected');
+          return;
+        }
+        await loadEvents();
+      } catch (statusError) {
+        if (!cancelled) {
+          setState('disconnected');
+          setError(statusError instanceof Error ? statusError.message : 'Calendar connection could not be checked.');
+        }
       }
-      await loadEvents();
     }
     void initialize();
     return () => { cancelled = true; };
   }, []);
 
-  async function connect() {
+  function connect() {
     setState('connecting');
     setError('');
-    try {
-      await authorizeGoogleCalendar();
-      setState('connected');
-      await loadEvents();
-    } catch (connectError) {
-      const message = connectError instanceof Error ? connectError.message : 'Google Calendar could not be connected.';
-      setState(message.includes('not configured') || message.includes('deployed Google OAuth') ? 'unconfigured' : 'disconnected');
-      setError(message);
-    }
+    connectGoogleCalendar('event');
   }
 
   async function disconnect() {
@@ -167,7 +172,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
 
         {(state === 'checking' || state === 'connecting' || loading) && (
           <div className="live-event-loading"><Loader2 className="spin" size={19} />
-            {state === 'connecting' ? 'Opening Google Calendar permission…' : 'Checking your calendar…'}
+            {state === 'connecting' ? 'Taking you to Google Calendar…' : 'Checking your calendar…'}
           </div>
         )}
 
@@ -176,7 +181,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
             <span className="calendar-detection-icon"><CalendarDays size={22} /></span>
             <div>
               <h3>Calendar connection is temporarily unavailable</h3>
-              <p>The TagOnce deployment is missing its Google OAuth client ID. No user setup is required.</p>
+              <p>The TagOnce deployment needs its Google OAuth client secret and callback configuration. No user setup is required.</p>
             </div>
           </div>
         )}
