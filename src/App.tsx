@@ -4,6 +4,7 @@ import './release02.css';
 import './release03.css';
 import './release04.css';
 import './release05.css';
+import './release06.css';
 import { AddressBookPage } from './components/AddressBookPage';
 import { CampaignsPage } from './components/CampaignsPage';
 import { CampaignComposer } from './components/CampaignComposer';
@@ -46,6 +47,21 @@ const defaultProfile: MyProfile = {
   website: 'https://aionehr.com',
   eventName: '',
   eventEndsAt: new Date().toISOString().slice(0, 10),
+  cardSelections: {
+    event: ['title', 'company', 'email', 'website', 'eventName', 'social:linkedin'],
+    personal: [
+      'title',
+      'company',
+      'email',
+      'phone',
+      'whatsapp',
+      'website',
+      'social:linkedin',
+      'social:instagram',
+      'social:facebook',
+    ],
+    custom: ['email', 'social:linkedin'],
+  },
 };
 
 const pageMeta: Record<PageKey, { title: string; eyebrow: string }> = {
