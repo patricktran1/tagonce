@@ -9,18 +9,19 @@ import './release07.css';
 import './release08.css';
 import './release09.css';
 import './release10.css';
+import './release11.css';
 import { AddressBookPage } from './components/AddressBookPage';
 import { CampaignsPage } from './components/CampaignsPage';
 import { CampaignComposer } from './components/CampaignComposer';
 import { ConnectionsPage } from './components/ConnectionsPage';
 import { DashboardPage } from './components/DashboardPage';
+import { EventCardLauncher } from './components/EventCardLauncher';
 import { Header } from './components/Header';
 import { MyCardsPage } from './components/MyCardsPage';
 import { ScanPage } from './components/ScanPage';
 import { SettingsPage } from './components/SettingsPage';
 import { Sidebar, type PageKey } from './components/Sidebar';
 import { defaultBrandSettings, demoEntities } from './data/demo';
-import { restoreGoogleCalendarReturn } from './lib/calendarService';
 import { loadLocal, saveLocal } from './lib/storage';
 import type {
   BrandSettings,
@@ -29,8 +30,6 @@ import type {
   MyProfile,
   SocialConnection,
 } from './types';
-
-restoreGoogleCalendarReturn();
 
 const ENTITY_KEY = 'tagonce.entities.v1';
 const CAMPAIGN_KEY = 'tagonce.campaigns.v1';
@@ -73,6 +72,7 @@ const defaultProfile: MyProfile = {
 
 const pageMeta: Record<PageKey, { title: string; eyebrow: string }> = {
   dashboard: { title: 'Dashboard', eyebrow: 'Identity workspace overview' },
+  event: { title: 'Live event', eyebrow: 'Calendar-powered event cards' },
   mycard: { title: 'My QR cards', eyebrow: 'Contextual identity exchange' },
   scan: { title: 'Receive card', eyebrow: 'Save the person and the moment' },
   address: { title: 'Address book', eyebrow: 'Social contacts and memories' },
@@ -155,6 +155,8 @@ export default function App() {
     switch (activePage) {
       case 'dashboard':
         return <DashboardPage campaigns={campaigns} entities={entities} onCreate={() => setActivePage('compose')} onOpenCampaigns={() => setActivePage('campaigns')} />;
+      case 'event':
+        return <EventCardLauncher profile={profile} onChange={setProfile} onOpenCards={() => setActivePage('mycard')} />;
       case 'mycard':
         return <MyCardsPage profile={profile} connections={connections} onChange={setProfile} />;
       case 'scan':
