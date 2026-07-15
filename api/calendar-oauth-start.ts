@@ -31,6 +31,12 @@ function clientId() {
   ).trim();
 }
 
+function validLoginHint(value: string | null) {
+  const normalized = value?.trim() || '';
+  if (!normalized || normalized.length > 254 || /\s/.test(normalized)) return '';
+  return /^[^@]+@[^@]+\.[^@]+$/.test(normalized) ? normalized : '';
+}
+
 export default {
   async fetch(request: Request) {
     if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
@@ -38,11 +44,13 @@ export default {
     const id = clientId();
     if (!id) return json({ error: 'Google Calendar OAuth client ID is not configured.' }, 503);
 
-    const origin = new URL(request.url).origin;
+    const requestUrl = new URL(request.url);
+    const origin = requestUrl.origin;
     const redirectUri = `${origin}/api/google-calendar/callback`;
+    const loginHint = validLoginHint(requestUrl.searchParams.get('login_hint'));
     const state = base64UrlEncode(crypto.getRandomValues(new Uint8Array(24)));
     const authorizationUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    authorizationUrl.search = new URLSearchParams({
+    const authorizationParams: Record<string, string> = {
       client_id: id,
       redirect_uri: redirectUri,
       response_type: 'code',
@@ -51,7 +59,9 @@ export default {
       include_granted_scopes: 'true',
       prompt: 'consent',
       state,
-    }).toString();
+    };
+    if (loginHint) authorizationParams.login_hint = loginHint;
+    authorizationUrl.search = new URLSearchParams(authorizationParams).toString();
 
     return new Response(null, {
       status: 302,
