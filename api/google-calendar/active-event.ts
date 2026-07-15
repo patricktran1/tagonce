@@ -120,56 +120,53 @@ async function fetchEvents(accessToken: string) {
   });
 }
 
-export default {
-  async fetch(request: Request) {
-    if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+export async function GET(request: Request) {
+  const config = getCalendarConfig(request);
+  if (!config) return json({ configured: false, connected: false, events: [] }, 503);
 
-    const config = getCalendarConfig(request);
-    if (!config) return json({ configured: false, connected: false, events: [] }, 503);
+  const cookies = parseCookies(request);
+  const encrypted = cookies.get(SESSION_COOKIE);
+  const storedSession = await decryptSession(encrypted, config.sessionSecret);
+  if (!storedSession) return json({ configured: true, connected: false, events: [] }, 401);
 
-    const cookies = parseCookies(request);
-    const encrypted = cookies.get(SESSION_COOKIE);
-    const storedSession = decryptSession(encrypted, config.sessionSecret);
-    if (!storedSession) return json({ configured: true, connected: false, events: [] }, 401);
+  try {
+    const session = await refreshCalendarSession(storedSession, config);
+    const response = await fetchEvents(session.accessToken);
+    const payload = await response.json().catch(() => ({})) as CalendarListResponse;
 
-    try {
-      const session = await refreshCalendarSession(storedSession, config);
-      const response = await fetchEvents(session.accessToken);
-      const payload = await response.json().catch(() => ({})) as CalendarListResponse;
-
-      if (response.status === 401 || response.status === 403) {
-        return json(
-          { configured: true, connected: false, reconnect: true, events: [], error: payload.error?.message || 'Calendar reconnect required.' },
-          401,
-          { 'Set-Cookie': clearCookie(SESSION_COOKIE) },
-        );
-      }
-      if (!response.ok) {
-        return json({ configured: true, connected: true, events: [], error: payload.error?.message || 'Calendar events could not be loaded.' }, response.status);
-      }
-
-      const now = Date.now();
-      const requestedEventName = new URL(request.url).searchParams.get('eventName')?.trim() || '';
-      const events = (payload.items || [])
-        .filter((event) => event.status !== 'cancelled' && !declined(event))
-        .map((event) => rankEvent(event, now, requestedEventName))
-        .filter((event): event is NonNullable<typeof event> => Boolean(event))
-        .sort((left, right) => right.score - left.score)
-        .slice(0, 3)
-        .map(({ score: _score, ...event }) => event);
-
-      const headers: HeadersInit = {};
-      if (session.accessToken !== storedSession.accessToken || session.expiresAt !== storedSession.expiresAt) {
-        headers['Set-Cookie'] = sessionCookie(session, config.sessionSecret);
-      }
-
-      return json({ configured: true, connected: true, checkedAt: new Date(now).toISOString(), events }, 200, headers);
-    } catch (error) {
+    if (response.status === 401 || response.status === 403) {
       return json(
-        { configured: true, connected: false, reconnect: true, events: [], error: error instanceof Error ? error.message : 'Calendar reconnect required.' },
+        { configured: true, connected: false, reconnect: true, events: [], error: payload.error?.message || 'Calendar reconnect required.' },
         401,
         { 'Set-Cookie': clearCookie(SESSION_COOKIE) },
       );
     }
-  },
-};
+    if (!response.ok) {
+      return json({ configured: true, connected: true, events: [], error: payload.error?.message || 'Calendar events could not be loaded.' }, response.status);
+    }
+
+    const now = Date.now();
+    const requestedEventName = new URL(request.url).searchParams.get('eventName')?.trim() || '';
+    const events = (payload.items || [])
+      .filter((event) => event.status !== 'cancelled' && !declined(event))
+      .map((event) => rankEvent(event, now, requestedEventName))
+      .filter((event): event is NonNullable<typeof event> => Boolean(event))
+      .sort((left, right) => right.score - left.score)
+      .slice(0, 3)
+      .map(({ score: _score, ...event }) => event);
+
+    const headers: HeadersInit = {};
+    if (session.accessToken !== storedSession.accessToken || session.expiresAt !== storedSession.expiresAt) {
+      headers['Set-Cookie'] = await sessionCookie(session, config.sessionSecret);
+    }
+
+    return json({ configured: true, connected: true, checkedAt: new Date(now).toISOString(), events }, 200, headers);
+  } catch (error) {
+    console.error('Google Calendar event lookup failed', error);
+    return json(
+      { configured: true, connected: false, reconnect: true, events: [], error: error instanceof Error ? error.message : 'Calendar reconnect required.' },
+      401,
+      { 'Set-Cookie': clearCookie(SESSION_COOKIE) },
+    );
+  }
+}
