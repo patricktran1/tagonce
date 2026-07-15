@@ -1,5 +1,6 @@
 import {
   CalendarCheck,
+  CalendarDays,
   Camera,
   Check,
   ContactRound,
@@ -9,19 +10,29 @@ import {
   Loader2,
   LocateFixed,
   MapPin,
+  RefreshCw,
   ScanLine,
   ShieldCheck,
   Sparkles,
+  Unplug,
   Upload,
   X,
 } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   compressImage,
   decodeCardPayload,
   downloadVCard,
   extractCardToken,
 } from '../lib/cardExchange';
+import {
+  connectGoogleCalendar,
+  disconnectGoogleCalendar,
+  getCalendarEventSuggestions,
+  getCalendarStatus,
+  type CalendarConnectionState,
+  type CalendarEventSuggestion,
+} from '../lib/calendarService';
 import {
   isPublishingPlatform,
   socialPlatformMeta,
@@ -50,7 +61,20 @@ interface InitialScanState {
 interface ReverseGeocodeResult {
   display_name?: string;
   name?: string;
-  address?: Record<string, string | undefined>;
+  address?: {
+    amenity?: string;
+    building?: string;
+    tourism?: string;
+    leisure?: string;
+    shop?: string;
+    road?: string;
+    city?: string;
+    town?: string;
+    village?: string;
+    suburb?: string;
+    county?: string;
+    state?: string;
+  };
 }
 
 function getInitialScanState(): InitialScanState {
@@ -120,6 +144,21 @@ async function reverseGeocode(latitude: number, longitude: number) {
   return response.json() as Promise<ReverseGeocodeResult>;
 }
 
+const relevanceLabels: Record<CalendarEventSuggestion['relevance'], string> = {
+  happening_now: 'Happening now',
+  starting_soon: 'Starting soon',
+  recently_ended: 'Just ended',
+  today: 'Today',
+};
+
+function calendarTimeLabel(event: CalendarEventSuggestion) {
+  const start = new Date(event.start);
+  const end = new Date(event.end);
+  const day = new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(start);
+  const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+  return `${day} · ${time.format(start)}–${time.format(end)}`;
+}
+
 export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
   const [initial] = useState(getInitialScanState);
   const [input, setInput] = useState(initial.input);
@@ -132,6 +171,10 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
   const [locationError, setLocationError] = useState('');
   const [locationNote, setLocationNote] = useState('');
   const [locating, setLocating] = useState(false);
+  const [calendarState, setCalendarState] = useState<CalendarConnectionState>('checking');
+  const [calendarSuggestions, setCalendarSuggestions] = useState<CalendarEventSuggestion[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState('');
   const [saved, setSaved] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -144,6 +187,62 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
   );
 
   const expired = Boolean(payload?.expiresAt && new Date(payload.expiresAt).getTime() < Date.now());
+
+  useEffect(() => {
+    if (!payload) return undefined;
+    let cancelled = false;
+
+    async function checkCalendar() {
+      setCalendarState('checking');
+      setCalendarError('');
+      const oauthResult = new URLSearchParams(window.location.search).get('calendar');
+      if (oauthResult === 'cancelled') setCalendarError('Google Calendar connection was cancelled.');
+      if (oauthResult && !['connected', 'cancelled'].includes(oauthResult)) {
+        setCalendarError('Google Calendar could not be connected. Check the app setup and try again.');
+      }
+
+      try {
+        const status = await getCalendarStatus();
+        if (cancelled) return;
+        if (!status.configured) {
+          setCalendarState('unconfigured');
+          return;
+        }
+        if (!status.connected) {
+          setCalendarState('disconnected');
+          return;
+        }
+
+        setCalendarState('connected');
+        setCalendarLoading(true);
+        const suggestionResponse = await getCalendarEventSuggestions(payload?.eventName || '');
+        if (cancelled) return;
+        if (!suggestionResponse.connected) {
+          setCalendarState('disconnected');
+          setCalendarSuggestions([]);
+          if (suggestionResponse.error) setCalendarError(suggestionResponse.error);
+          return;
+        }
+        setCalendarSuggestions(suggestionResponse.events || []);
+      } catch (calendarFailure) {
+        if (!cancelled) {
+          setCalendarState('disconnected');
+          setCalendarError(calendarFailure instanceof Error ? calendarFailure.message : 'Calendar could not be checked.');
+        }
+      } finally {
+        if (!cancelled) setCalendarLoading(false);
+      }
+
+      const cleanUrl = new URL(window.location.href);
+      if (cleanUrl.searchParams.has('calendar')) {
+        cleanUrl.searchParams.delete('calendar');
+        window.history.replaceState({}, '', cleanUrl);
+      }
+    }
+
+    void checkCalendar();
+    return () => { cancelled = true; };
+  }, [payload]);
 
   function openCard() {
     const token = extractCardToken(input);
@@ -222,6 +321,44 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
     setLocationNote('Event context restored from the scanned TagOnce card.');
   }
 
+  function useCalendarEvent(event: CalendarEventSuggestion) {
+    setMetAt([event.title, event.location].filter(Boolean).join(' · '));
+    setLocationError('');
+    setLocationNote(`Meeting context filled from Google Calendar: ${event.title}.`);
+  }
+
+  async function refreshCalendarSuggestions() {
+    if (!payload) return;
+    setCalendarLoading(true);
+    setCalendarError('');
+    try {
+      const response = await getCalendarEventSuggestions(payload.eventName || '');
+      if (!response.connected) {
+        setCalendarState('disconnected');
+        setCalendarSuggestions([]);
+        setCalendarError(response.error || 'Google Calendar needs to be reconnected.');
+        return;
+      }
+      setCalendarState('connected');
+      setCalendarSuggestions(response.events || []);
+    } catch (calendarFailure) {
+      setCalendarError(calendarFailure instanceof Error ? calendarFailure.message : 'Calendar could not be checked.');
+    } finally {
+      setCalendarLoading(false);
+    }
+  }
+
+  async function disconnectCalendar() {
+    try {
+      await disconnectGoogleCalendar();
+      setCalendarState('disconnected');
+      setCalendarSuggestions([]);
+      setCalendarError('');
+    } catch (calendarFailure) {
+      setCalendarError(calendarFailure instanceof Error ? calendarFailure.message : 'Calendar could not be disconnected.');
+    }
+  }
+
   function saveContact() {
     if (!payload || expired) return;
     const mappings: MentionEntity['mappings'] = {};
@@ -277,6 +414,8 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
     setMetAt('');
     setLocationError('');
     setLocationNote('');
+    setCalendarSuggestions([]);
+    setCalendarError('');
   }
 
   return (
@@ -398,13 +537,72 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
                 </button>
                 {payload.eventName && (
                   <button className="meeting-context-button event-context-button" onClick={useEventContext}>
-                    <CalendarCheck size={15} /> Use event: {payload.eventName}
+                    <CalendarCheck size={15} /> Use QR event: {payload.eventName}
                   </button>
                 )}
               </div>
               <small className="location-privacy-note">GPS is requested only when you tap the button. Review or edit the result before saving.</small>
               {locationNote && <div className="location-status-note">{locationNote}</div>}
               {locationError && <div className="inline-error">{locationError}</div>}
+
+              <div className={`calendar-detection-card calendar-${calendarState}`}>
+                <div className="calendar-detection-heading">
+                  <span className="calendar-detection-icon"><CalendarDays size={18} /></span>
+                  <span>
+                    <strong>Find this event from your calendar</strong>
+                    <small>Useful for Luma and other registrations added to Google Calendar.</small>
+                  </span>
+                  {calendarState === 'connected' && (
+                    <button className="icon-button small-icon-button" disabled={calendarLoading} onClick={refreshCalendarSuggestions} aria-label="Refresh calendar suggestions">
+                      <RefreshCw className={calendarLoading ? 'spin' : ''} size={15} />
+                    </button>
+                  )}
+                </div>
+
+                {(calendarState === 'checking' || calendarLoading) && (
+                  <div className="calendar-loading-state"><Loader2 className="spin" size={16} /> Checking nearby calendar events…</div>
+                )}
+
+                {calendarState === 'disconnected' && !calendarLoading && (
+                  <div className="calendar-connect-state">
+                    <span>Connect once with read-only access. TagOnce will suggest events near the current time.</span>
+                    <button className="button secondary small-button" onClick={connectGoogleCalendar}><CalendarCheck size={15} /> Connect Google Calendar</button>
+                  </div>
+                )}
+
+                {calendarState === 'unconfigured' && (
+                  <div className="calendar-connect-state muted-calendar-state">
+                    <span>Calendar sync is built but still needs Google OAuth credentials in Vercel.</span>
+                  </div>
+                )}
+
+                {calendarState === 'connected' && !calendarLoading && calendarSuggestions.length === 0 && (
+                  <div className="calendar-empty-state">No current, just-ended, or soon-starting event was found on your primary calendar.</div>
+                )}
+
+                {calendarState === 'connected' && calendarSuggestions.length > 0 && (
+                  <div className="calendar-suggestion-list">
+                    {calendarSuggestions.map((event) => (
+                      <article className={event.matchesCard ? 'calendar-suggestion matches-card' : 'calendar-suggestion'} key={event.id}>
+                        <div className="calendar-suggestion-copy">
+                          <span className="calendar-relevance-pill">{event.matchesCard ? 'Matches card' : relevanceLabels[event.relevance]}</span>
+                          <strong>{event.title}</strong>
+                          <small>{event.location || 'No venue listed'} · {calendarTimeLabel(event)}</small>
+                        </div>
+                        <div className="calendar-suggestion-actions">
+                          {event.htmlLink && <a href={event.htmlLink} target="_blank" rel="noreferrer" aria-label={`Open ${event.title} in Google Calendar`}><ExternalLink size={14} /></a>}
+                          <button onClick={() => useCalendarEvent(event)}>Use event</button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+
+                {calendarState === 'connected' && (
+                  <button className="text-button calendar-disconnect-button" onClick={disconnectCalendar}><Unplug size={13} /> Disconnect calendar</button>
+                )}
+                {calendarError && <div className="inline-error calendar-inline-error">{calendarError}</div>}
+              </div>
             </div>
 
             <label className="field"><span>What should you remember?</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="What they do, what you discussed, and the next step..." /></label>
