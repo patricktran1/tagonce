@@ -27,23 +27,19 @@ https://tagonce.vercel.app
 
 Do not add a path or trailing slash to the JavaScript origin.
 
+The origin must be added to the exact OAuth client whose Client ID is deployed in Vercel. If Google shows `no registered origin`, compare the client ID in Google Cloud with the value of `VITE_GOOGLE_CALENDAR_CLIENT_ID` in Vercel and correct the mismatch.
+
 The former `/api/google-calendar/callback` redirect URI is no longer used by TagOnce and can be removed.
 
-## 3. Client ID
+## 3. Deploy the public Client ID
 
-The Google OAuth Client ID is a public browser identifier, not a secret. There are two supported options.
-
-### Production option
-
-Add this Vercel environment variable and redeploy:
+The Google OAuth Client ID is a public browser identifier, not a secret. Add this Vercel environment variable and redeploy:
 
 ```text
 VITE_GOOGLE_CALENDAR_CLIENT_ID=your-client-id.apps.googleusercontent.com
 ```
 
-### Immediate testing option
-
-Press **Connect calendar** in TagOnce and paste the OAuth Client ID when prompted. TagOnce stores that public client ID in the browser for future visits.
+Apply it to Production and any fixed Preview domains you intend to authorize. TagOnce does not ask users to enter a client ID.
 
 Do not paste or expose the Google client secret. TagOnce does not need it for this browser authorization flow.
 
