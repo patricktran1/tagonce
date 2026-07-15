@@ -3,7 +3,6 @@ import {
   FileStack,
   IdCard,
   LayoutDashboard,
-  Link2,
   PenLine,
   ScanLine,
   Settings,
@@ -31,7 +30,6 @@ const items = [
   { key: 'scan' as const, label: 'Receive card', icon: ScanLine },
   { key: 'address' as const, label: 'Address book', icon: ContactRound },
   { key: 'compose' as const, label: 'Create post', icon: PenLine },
-  { key: 'connections' as const, label: 'Social accounts', icon: Link2 },
   { key: 'campaigns' as const, label: 'Campaigns', icon: FileStack },
   { key: 'settings' as const, label: 'Brand settings', icon: Settings },
 ];
@@ -65,7 +63,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
       <div className="sidebar-footer">
         <div className="beta-note">
           <strong>Context cards live</strong>
-          <span>QR exchange, vCards, private memories and tag-ready contacts.</span>
+          <span>QR exchange, vCards, clickable socials, memories and tag-ready contacts.</span>
         </div>
       </div>
     </aside>
