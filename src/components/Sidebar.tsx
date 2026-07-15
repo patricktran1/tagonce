@@ -1,21 +1,23 @@
 import {
-  AtSign,
-  CalendarDays,
+  ContactRound,
   FileStack,
+  IdCard,
   LayoutDashboard,
   Link2,
   PenLine,
+  ScanLine,
   Settings,
   Sparkles,
 } from 'lucide-react';
 
 export type PageKey =
   | 'dashboard'
+  | 'mycard'
+  | 'scan'
+  | 'address'
   | 'compose'
   | 'connections'
-  | 'mentions'
   | 'campaigns'
-  | 'calendar'
   | 'settings';
 
 interface SidebarProps {
@@ -25,11 +27,12 @@ interface SidebarProps {
 
 const items = [
   { key: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'compose' as const, label: 'Create', icon: PenLine },
-  { key: 'connections' as const, label: 'Connect socials', icon: Link2 },
-  { key: 'mentions' as const, label: 'Identity book', icon: AtSign },
+  { key: 'mycard' as const, label: 'My QR cards', icon: IdCard },
+  { key: 'scan' as const, label: 'Receive card', icon: ScanLine },
+  { key: 'address' as const, label: 'Address book', icon: ContactRound },
+  { key: 'compose' as const, label: 'Create post', icon: PenLine },
+  { key: 'connections' as const, label: 'Social accounts', icon: Link2 },
   { key: 'campaigns' as const, label: 'Campaigns', icon: FileStack },
-  { key: 'calendar' as const, label: 'Calendar', icon: CalendarDays },
   { key: 'settings' as const, label: 'Brand settings', icon: Settings },
 ];
 
@@ -37,31 +40,22 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
   return (
     <aside className="sidebar">
       <button className="brand-lockup" onClick={() => onNavigate('dashboard')}>
-        <span className="brand-glyph">
-          <Sparkles size={18} />
-        </span>
+        <span className="brand-glyph"><Sparkles size={18} /></span>
         <span>
           <strong>TagOnce</strong>
-          <small>Connect once. Tag everywhere.</small>
+          <small>Share right. Remember more. Tag everywhere.</small>
         </span>
       </button>
 
       <div className="workspace-card">
         <span className="workspace-avatar">PT</span>
-        <span>
-          <small>Workspace</small>
-          <strong>Patrick's Studio</strong>
-        </span>
+        <span><small>Workspace</small><strong>Patrick's Studio</strong></span>
       </div>
 
       <nav className="sidebar-nav" aria-label="Primary navigation">
-        <div className="nav-label">Workspace</div>
+        <div className="nav-label">Identity workspace</div>
         {items.map(({ key, label, icon: Icon }) => (
-          <button
-            className={activePage === key ? 'nav-item active' : 'nav-item'}
-            key={key}
-            onClick={() => onNavigate(key)}
-          >
+          <button className={activePage === key ? 'nav-item active' : 'nav-item'} key={key} onClick={() => onNavigate(key)}>
             <Icon size={18} />
             {label}
           </button>
@@ -70,8 +64,8 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
       <div className="sidebar-footer">
         <div className="beta-note">
-          <strong>Identity layer beta</strong>
-          <span>Manual linking now. Secure OAuth connections next.</span>
+          <strong>Context cards live</strong>
+          <span>QR exchange, vCards, private memories and tag-ready contacts.</span>
         </div>
       </div>
     </aside>
