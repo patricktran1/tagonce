@@ -85,7 +85,7 @@ export async function getCalendarEventSuggestions(eventName = '') {
   return payload;
 }
 
-export function connectGoogleCalendar(returnView?: 'event') {
+export function connectGoogleCalendar(returnView?: unknown) {
   const returnTo = returnView === 'event'
     ? '/?view=event'
     : `${window.location.pathname}${window.location.search}${window.location.hash}`;
