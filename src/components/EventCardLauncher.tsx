@@ -48,11 +48,16 @@ function localDateValue(value: string) {
   return `${year}-${month}-${day}`;
 }
 
+function validEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
 export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardLauncherProps) {
   const [state, setState] = useState<CalendarConnectionState>('checking');
   const [events, setEvents] = useState<CalendarEventSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [googleEmail, setGoogleEmail] = useState(profile.email || '');
 
   async function loadEvents() {
     setLoading(true);
@@ -112,10 +117,10 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     return () => { cancelled = true; };
   }, []);
 
-  function connect() {
+  function connect(useEmailHint: boolean) {
     setState('connecting');
     setError('');
-    connectGoogleCalendar('event');
+    connectGoogleCalendar('event', useEmailHint ? googleEmail : '');
   }
 
   async function disconnect() {
@@ -191,8 +196,31 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
             <span className="calendar-detection-icon"><CalendarCheck size={22} /></span>
             <div>
               <h3>Connect Google Calendar</h3>
-              <p>Read-only access. TagOnce sees event titles, times and locations but cannot change your calendar.</p>
-              <button className="button primary" onClick={connect}><CalendarCheck size={17} /> Connect calendar</button>
+              <p>Read-only access. Entering your Google email skips the account chooser when Safari gets stuck there.</p>
+              <div className="calendar-account-connect">
+                <label htmlFor="calendar-google-email">Google account email</label>
+                <div className="calendar-account-row">
+                  <input
+                    id="calendar-google-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@gmail.com"
+                    value={googleEmail}
+                    onChange={(event) => setGoogleEmail(event.target.value)}
+                  />
+                  <button
+                    className="button primary"
+                    disabled={!validEmail(googleEmail)}
+                    onClick={() => connect(true)}
+                  >
+                    <CalendarCheck size={17} /> Continue
+                  </button>
+                </div>
+                <span className="calendar-account-help">Used only to tell Google which signed-in account to open. TagOnce does not store it separately.</span>
+                <button className="text-button calendar-choose-account" onClick={() => connect(false)}>
+                  Choose from signed-in accounts instead
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -205,7 +233,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
           </div>
         )}
 
-        {state === 'connected' && events.length > 0 && (
+        {state === 'connected' && !loading && events.length > 0 && (
           <div className="live-event-list">
             {events.map((event) => (
               <article className={event.matchesCard ? 'live-event-card matches-card' : 'live-event-card'} key={event.id}>
