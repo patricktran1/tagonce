@@ -103,6 +103,20 @@ export function saveGoogleCalendarClientId(clientId: string) {
   }
 }
 
+function requestClientId() {
+  const existing = getGoogleCalendarClientId();
+  if (existing) return existing;
+  const entered = window.prompt(
+    'Paste the Google OAuth Client ID for TagOnce. This is the public value ending in apps.googleusercontent.com, not the client secret.',
+  )?.trim() || '';
+  if (!entered) throw new Error('Google Calendar connection was cancelled.');
+  if (!entered.endsWith('.apps.googleusercontent.com')) {
+    throw new Error('That does not look like a Google OAuth Client ID.');
+  }
+  saveGoogleCalendarClientId(entered);
+  return entered;
+}
+
 function readToken(): StoredCalendarToken | null {
   try {
     const raw = window.localStorage.getItem(TOKEN_KEY);
@@ -136,6 +150,10 @@ function loadGoogleIdentityScript() {
   scriptPromise = new Promise<void>((resolve, reject) => {
     const existing = document.getElementById(GOOGLE_SCRIPT_ID) as HTMLScriptElement | null;
     if (existing) {
+      if (window.google?.accounts?.oauth2) {
+        resolve();
+        return;
+      }
       existing.addEventListener('load', () => resolve(), { once: true });
       existing.addEventListener('error', () => reject(new Error('Google authorization could not be loaded.')), { once: true });
       return;
@@ -155,14 +173,12 @@ function loadGoogleIdentityScript() {
 }
 
 export async function getCalendarStatus(): Promise<CalendarStatusResponse> {
-  const configured = Boolean(getGoogleCalendarClientId());
-  const token = configured ? readToken() : null;
-  return { configured, connected: Boolean(token), scope: token?.scope };
+  const token = readToken();
+  return { configured: true, connected: Boolean(token), scope: token?.scope };
 }
 
-export async function connectGoogleCalendar() {
-  const clientId = getGoogleCalendarClientId();
-  if (!clientId) throw new Error('Add the Google OAuth client ID first.');
+export async function authorizeGoogleCalendar() {
+  const clientId = requestClientId();
   await loadGoogleIdentityScript();
   const oauth2 = window.google?.accounts?.oauth2;
   if (!oauth2) throw new Error('Google authorization is unavailable in this browser.');
@@ -183,6 +199,14 @@ export async function connectGoogleCalendar() {
     });
     client.requestAccessToken({ prompt: 'consent' });
   });
+}
+
+export function connectGoogleCalendar() {
+  void authorizeGoogleCalendar()
+    .then(() => window.location.reload())
+    .catch((error) => {
+      window.alert(error instanceof Error ? error.message : 'Google Calendar could not be connected.');
+    });
 }
 
 export async function disconnectGoogleCalendar() {
@@ -287,7 +311,7 @@ function rankEvent(event: GoogleCalendarEvent, now: number, requestedEventName: 
 export async function getCalendarEventSuggestions(eventName = '') {
   const token = readToken();
   if (!token) {
-    return { configured: Boolean(getGoogleCalendarClientId()), connected: false, events: [] as CalendarEventSuggestion[] };
+    return { configured: true, connected: false, events: [] as CalendarEventSuggestion[] };
   }
 
   const now = Date.now();
