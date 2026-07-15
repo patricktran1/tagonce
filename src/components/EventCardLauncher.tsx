@@ -59,6 +59,11 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     setError('');
     try {
       const response = await getCalendarEventSuggestions(profile.eventName || '');
+      if (!response.configured) {
+        setState('unconfigured');
+        setEvents([]);
+        return;
+      }
       if (!response.connected) {
         setState('disconnected');
         setEvents([]);
@@ -80,6 +85,10 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     async function initialize() {
       const status = await getCalendarStatus();
       if (cancelled) return;
+      if (!status.configured) {
+        setState('unconfigured');
+        return;
+      }
       if (!status.connected) {
         setState('disconnected');
         return;
@@ -98,8 +107,9 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
       setState('connected');
       await loadEvents();
     } catch (connectError) {
-      setState('disconnected');
-      setError(connectError instanceof Error ? connectError.message : 'Google Calendar could not be connected.');
+      const message = connectError instanceof Error ? connectError.message : 'Google Calendar could not be connected.';
+      setState(message.includes('not configured') || message.includes('deployed Google OAuth') ? 'unconfigured' : 'disconnected');
+      setError(message);
     }
   }
 
@@ -158,6 +168,16 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
         {(state === 'checking' || state === 'connecting' || loading) && (
           <div className="live-event-loading"><Loader2 className="spin" size={19} />
             {state === 'connecting' ? 'Opening Google Calendar permission…' : 'Checking your calendar…'}
+          </div>
+        )}
+
+        {state === 'unconfigured' && !loading && (
+          <div className="live-event-connect muted-calendar-state">
+            <span className="calendar-detection-icon"><CalendarDays size={22} /></span>
+            <div>
+              <h3>Calendar connection is temporarily unavailable</h3>
+              <p>The TagOnce deployment is missing its Google OAuth client ID. No user setup is required.</p>
+            </div>
           </div>
         )}
 
