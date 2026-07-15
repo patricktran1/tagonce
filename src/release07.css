@@ -1,0 +1,290 @@
+/* Release 0.7: unified social card editing and clickable profile actions */
+.unified-card-studio-grid {
+  grid-template-columns: minmax(520px, 1.12fr) minmax(420px, 0.88fr);
+  align-items: start;
+}
+
+.inline-social-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 22px;
+  border-top: 1px solid #ece8f1;
+  padding-top: 22px;
+}
+
+.inline-social-editor-heading h3,
+.inline-social-editor-heading p {
+  margin: 0;
+}
+
+.inline-social-editor-heading h3 {
+  margin-top: 5px;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+}
+
+.inline-social-editor-heading p {
+  margin-top: 5px;
+  color: #827c88;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.social-profile-editor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.optional-social-list {
+  padding-top: 2px;
+}
+
+.social-profile-editor {
+  border: 1px solid #e9e5ed;
+  border-radius: 14px;
+  padding: 12px;
+  background: #fbfafc;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.social-profile-editor.selected {
+  border-color: rgba(119, 83, 205, 0.38);
+  background: #fcfaff;
+  box-shadow: 0 9px 24px rgba(67, 48, 92, 0.06);
+}
+
+.social-profile-editor-heading {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.social-profile-editor-heading strong,
+.social-profile-editor-heading small {
+  display: block;
+}
+
+.social-profile-editor-heading strong {
+  font-size: 11px;
+}
+
+.social-profile-editor-heading small {
+  margin-top: 2px;
+  color: #88828d;
+  font-size: 9px;
+}
+
+.card-share-toggle {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid #ddd7e3;
+  border-radius: 999px;
+  padding: 0 10px;
+  color: #77717c;
+  background: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.card-share-toggle.selected {
+  border-color: rgba(119, 83, 205, 0.32);
+  color: #5d3fa9;
+  background: rgba(167, 137, 255, 0.12);
+}
+
+.card-share-toggle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.social-profile-inputs {
+  display: grid;
+  grid-template-columns: minmax(125px, 0.72fr) minmax(220px, 1.28fr);
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.social-profile-inputs .field input {
+  background: #fff;
+}
+
+.more-networks-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px dashed #d9d2e1;
+  border-radius: 13px;
+  padding: 11px 13px;
+  color: #746e79;
+  background: #faf9fb;
+  text-align: left;
+  cursor: pointer;
+}
+
+.more-networks-button strong,
+.more-networks-button small {
+  display: block;
+}
+
+.more-networks-button strong {
+  color: var(--ink);
+  font-size: 10px;
+}
+
+.more-networks-button small {
+  margin-top: 3px;
+  font-size: 8px;
+}
+
+.more-networks-button svg {
+  transition: transform 160ms ease;
+}
+
+.more-networks-button.open svg {
+  transform: rotate(180deg);
+}
+
+.compact-selector-panel .share-field-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.share-card-social-links {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 2px 0 15px;
+}
+
+.share-card-social-links a {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 29px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 11px;
+  padding: 8px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  text-decoration: none;
+}
+
+.share-card-social-links a:hover {
+  border-color: rgba(201, 255, 98, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.share-card-social-links strong,
+.share-card-social-links small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-card-social-links strong {
+  font-size: 9px;
+}
+
+.share-card-social-links small {
+  margin-top: 2px;
+  color: #bdb6c5;
+  font-size: 8px;
+}
+
+.share-card-social-links > a > svg {
+  color: #bcb5c3;
+}
+
+.no-shared-socials {
+  grid-column: 1 / -1;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: 11px;
+  padding: 10px;
+  color: #bcb5c3;
+  font-size: 8px;
+  text-align: center;
+}
+
+.share-card-event,
+.share-card-personal,
+.share-card-custom {
+  min-height: 610px;
+}
+
+.received-socials a {
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+}
+
+.received-social-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  color: var(--lavender-deep);
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.platform-snapchat {
+  color: #17151b;
+  background: #fff16a;
+}
+
+.platform-pinterest {
+  color: #fff;
+  background: #bd1831;
+}
+
+.platform-github {
+  color: #fff;
+  background: #25222a;
+  font-size: 7px;
+}
+
+@media (max-width: 1120px) {
+  .unified-card-studio-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .contextual-card-preview {
+    max-width: 760px;
+    width: 100%;
+    justify-self: center;
+  }
+}
+
+@media (max-width: 720px) {
+  .social-profile-inputs,
+  .compact-selector-panel .share-field-grid,
+  .share-card-social-links {
+    grid-template-columns: 1fr;
+  }
+
+  .social-profile-editor-heading {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .card-share-toggle {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .share-card-event,
+  .share-card-personal,
+  .share-card-custom {
+    min-height: 560px;
+  }
+}
