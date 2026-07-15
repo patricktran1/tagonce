@@ -1,8 +1,10 @@
 import {
   BriefcaseBusiness,
   Check,
+  ChevronDown,
   Copy,
   Download,
+  ExternalLink,
   IdCard,
   Lock,
   QrCode,
@@ -14,13 +16,22 @@ import {
 import { useMemo, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { createShareUrl, downloadVCard } from '../lib/cardExchange';
+import {
+  allSocialPlatforms,
+  coreSocialPlatforms,
+  optionalSocialPlatforms,
+  socialPlatformMeta,
+  socialProfileUrl,
+} from '../data/socials';
 import type {
   CardMode,
   MyProfile,
   Platform,
   ShareCardPayload,
+  SharedSocialIdentity,
   ShareFieldKey,
   SocialConnection,
+  SocialPlatform,
 } from '../types';
 import { PlatformMark } from './PlatformMark';
 
@@ -29,16 +40,6 @@ interface MyCardsPageProps {
   connections: SocialConnection[];
   onChange: (profile: MyProfile) => void;
 }
-
-const allSocialPlatforms: Platform[] = [
-  'linkedin',
-  'instagram',
-  'facebook',
-  'x',
-  'threads',
-  'tiktok',
-  'youtube',
-];
 
 const defaultSelections: Record<CardMode, ShareFieldKey[]> = {
   event: ['title', 'company', 'email', 'website', 'eventName', 'social:linkedin'],
@@ -52,6 +53,7 @@ const defaultSelections: Record<CardMode, ShareFieldKey[]> = {
     'social:linkedin',
     'social:instagram',
     'social:facebook',
+    'social:x',
   ],
   custom: ['email', 'social:linkedin'],
 };
@@ -73,7 +75,7 @@ const modeMeta: Record<CardMode, { label: string; access: string; description: s
   event: {
     label: 'Event',
     access: 'Professional access',
-    description: 'A professional preset you can still customize for today’s room.',
+    description: 'A professional preset you can customize for today’s room.',
   },
   personal: {
     label: 'Personal',
@@ -100,18 +102,26 @@ function profileFieldValue(profile: MyProfile, key: ShareFieldKey) {
   }
 }
 
-function hasValue(profile: MyProfile, key: ShareFieldKey, connectionMap: Map<Platform, SocialConnection>) {
-  if (key.startsWith('social:')) {
-    const platform = key.slice('social:'.length) as Platform;
-    const connection = connectionMap.get(platform);
-    return Boolean(connection?.handle?.trim() || connection?.profileUrl?.trim());
+function socialDisplay(identity: SharedSocialIdentity) {
+  if (identity.handle?.trim()) {
+    const handle = identity.handle.trim();
+    return handle.startsWith('@') ? handle : `@${handle}`;
   }
-  return Boolean(profileFieldValue(profile, key).trim());
+  if (!identity.profileUrl) return '';
+  try {
+    const url = new URL(identity.profileUrl);
+    return url.pathname.replace(/^\/+|\/+$/g, '') || url.hostname;
+  } catch {
+    return identity.profileUrl;
+  }
 }
 
 export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps) {
   const [mode, setMode] = useState<CardMode>('event');
   const [copied, setCopied] = useState(false);
+  const [showMoreNetworks, setShowMoreNetworks] = useState(() =>
+    optionalSocialPlatforms.some((platform) => Boolean(profile.socialProfiles?.[platform]?.handle || profile.socialProfiles?.[platform]?.profileUrl)),
+  );
 
   function update<K extends keyof MyProfile>(key: K, value: MyProfile[K]) {
     onChange({ ...profile, [key]: value });
@@ -127,6 +137,16 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
     [mode, profile.cardSelections],
   );
 
+  function socialIdentity(platform: SocialPlatform): SharedSocialIdentity {
+    const saved = profile.socialProfiles?.[platform];
+    if (saved?.handle || saved?.profileUrl) return saved;
+    const legacy = connectionMap.get(platform as Platform);
+    return {
+      handle: legacy?.handle,
+      profileUrl: legacy?.profileUrl,
+    };
+  }
+
   function setSelectedFields(next: ShareFieldKey[]) {
     onChange({
       ...profile,
@@ -138,12 +158,44 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
   }
 
   function toggleField(key: ShareFieldKey) {
-    if (!hasValue(profile, key, connectionMap)) return;
+    const available = key.startsWith('social:')
+      ? Boolean(socialIdentity(key.slice('social:'.length) as SocialPlatform).handle || socialIdentity(key.slice('social:'.length) as SocialPlatform).profileUrl)
+      : Boolean(profileFieldValue(profile, key).trim());
+    if (!available) return;
     setSelectedFields(
       selectedFields.includes(key)
         ? selectedFields.filter((field) => field !== key)
         : [...selectedFields, key],
     );
+  }
+
+  function updateSocial(
+    platform: SocialPlatform,
+    key: keyof SharedSocialIdentity,
+    value: string,
+  ) {
+    const existing = socialIdentity(platform);
+    const socialKey: ShareFieldKey = `social:${platform}`;
+    const wasEmpty = !existing.handle?.trim() && !existing.profileUrl?.trim();
+    const becomesAvailable = wasEmpty && Boolean(value.trim());
+    const nextSelections = becomesAvailable && !selectedFields.includes(socialKey)
+      ? [...selectedFields, socialKey]
+      : selectedFields;
+
+    onChange({
+      ...profile,
+      socialProfiles: {
+        ...profile.socialProfiles,
+        [platform]: {
+          ...existing,
+          [key]: value,
+        },
+      },
+      cardSelections: {
+        ...profile.cardSelections,
+        [mode]: nextSelections,
+      },
+    });
   }
 
   function resetPreset() {
@@ -156,11 +208,12 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
 
     allSocialPlatforms.forEach((platform) => {
       if (!includes(`social:${platform}`)) return;
-      const connection = connectionMap.get(platform);
-      if (connection?.handle || connection?.profileUrl) {
+      const identity = socialIdentity(platform);
+      const url = socialProfileUrl(platform, identity);
+      if (identity.handle || url) {
         socials[platform] = {
-          handle: connection.handle,
-          profileUrl: connection.profileUrl,
+          handle: identity.handle?.trim() || undefined,
+          profileUrl: url || undefined,
         };
       }
     });
@@ -191,7 +244,11 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
   }, [connectionMap, mode, profile, selectedFields]);
 
   const shareUrl = useMemo(() => createShareUrl(payload), [payload]);
-  const activeSocials = Object.keys(payload.socials).length;
+  const activeSocialEntries = Object.entries(payload.socials) as Array<[
+    SocialPlatform,
+    SharedSocialIdentity,
+  ]>;
+  const activeSocials = activeSocialEntries.length;
   const activeDetails = Object.values(payload.profile).filter(Boolean).length;
   const cardSubtitle = [payload.profile.title, payload.profile.company].filter(Boolean).join(' · ');
 
@@ -201,29 +258,73 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
     window.setTimeout(() => setCopied(false), 1400);
   }
 
+  function socialEditor(platform: SocialPlatform) {
+    const identity = socialIdentity(platform);
+    const meta = socialPlatformMeta[platform];
+    const shareKey: ShareFieldKey = `social:${platform}`;
+    const available = Boolean(identity.handle?.trim() || identity.profileUrl?.trim());
+    const selected = selectedFields.includes(shareKey);
+
+    return (
+      <article className={`social-profile-editor${selected ? ' selected' : ''}`} key={platform}>
+        <div className="social-profile-editor-heading">
+          <PlatformMark platform={platform} />
+          <span><strong>{meta.label}</strong><small>{meta.description}</small></span>
+          <button
+            className={`card-share-toggle${selected ? ' selected' : ''}`}
+            disabled={!available}
+            onClick={() => toggleField(shareKey)}
+            aria-pressed={selected}
+          >
+            {selected ? <Check size={13} /> : null}
+            {selected ? 'Shared' : available ? 'Share' : 'Add first'}
+          </button>
+        </div>
+        <div className="social-profile-inputs">
+          <label className="field compact-field">
+            <span>Handle</span>
+            <input
+              value={identity.handle ?? ''}
+              onChange={(event) => updateSocial(platform, 'handle', event.target.value)}
+              placeholder={platform === 'linkedin' ? 'Vanity name' : '@username'}
+            />
+          </label>
+          <label className="field compact-field">
+            <span>Profile link</span>
+            <input
+              value={identity.profileUrl ?? ''}
+              onChange={(event) => updateSocial(platform, 'profileUrl', event.target.value)}
+              placeholder={`https://…`}
+            />
+          </label>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <div className="page-stack card-studio-page">
       <section className="card-studio-hero">
         <div>
           <span className="hero-kicker">Contextual identity exchange</span>
-          <h2>Share the right version of you.</h2>
+          <h2>One card studio. Every way to connect.</h2>
           <p>
-            Start with an Event or Personal preset, then highlight exactly which fields belong on
-            that card. Use Custom when the moment needs its own rules.
+            Edit your contact details and social links together, choose exactly what each card reveals,
+            then share one QR with clickable profiles and a complete downloadable vCard.
           </p>
         </div>
         <div className="privacy-promise">
           <ShieldCheck size={18} />
-          <span><strong>You choose every field.</strong><small>Your name stays visible so the contact remains human and usable.</small></span>
+          <span><strong>You choose every field.</strong><small>Social links are shared only on the card modes you highlight.</small></span>
         </div>
       </section>
 
-      <div className="card-studio-grid">
+      <div className="card-studio-grid unified-card-studio-grid">
         <section className="panel card-profile-editor">
           <div className="panel-heading">
             <div>
               <span className="step-badge">YOU</span>
-              <div><h3>Your contact identity</h3><p>Add the details that can be selected for any card.</p></div>
+              <div><h3>Your complete contact identity</h3><p>Everything editable now lives in this card studio.</p></div>
             </div>
           </div>
 
@@ -249,6 +350,20 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
               </div>
             </div>
           </div>
+
+          <div className="inline-social-editor">
+            <div className="inline-social-editor-heading">
+              <div><span className="eyebrow">Social profiles</span><h3>Add, edit and choose what this card shares</h3><p>Handles are enough for most networks; a pasted profile URL is safest for LinkedIn and Facebook.</p></div>
+            </div>
+            <div className="social-profile-editor-list">
+              {coreSocialPlatforms.map(socialEditor)}
+            </div>
+            <button className={`more-networks-button${showMoreNetworks ? ' open' : ''}`} onClick={() => setShowMoreNetworks((current) => !current)}>
+              <span><strong>{showMoreNetworks ? 'Hide optional networks' : 'Show more networks'}</strong><small>Threads, TikTok, YouTube, Snapchat, Pinterest and GitHub</small></span>
+              <ChevronDown size={17} />
+            </button>
+            {showMoreNetworks && <div className="social-profile-editor-list optional-social-list">{optionalSocialPlatforms.map(socialEditor)}</div>}
+          </div>
         </section>
 
         <section className="panel contextual-card-preview">
@@ -258,22 +373,18 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
             <button className={mode === 'custom' ? 'active' : ''} onClick={() => setMode('custom')}><SlidersHorizontal size={16} /> Custom</button>
           </div>
 
-          <div className="field-selector-panel">
+          <div className="field-selector-panel compact-selector-panel">
             <div className="field-selector-heading">
               <div><span className="eyebrow">Fields shared</span><h3>{modeMeta[mode].label} card controls</h3><p>{modeMeta[mode].description}</p></div>
               <button className="text-button reset-fields-button" onClick={resetPreset}><RefreshCw size={14} /> Reset preset</button>
             </div>
 
             <div className="share-field-group">
-              <span className="share-field-group-label">Identity</span>
-              <button className="share-field-chip selected locked" disabled><Lock size={13} /><span><strong>Name</strong><small>Always included</small></span><Check size={14} /></button>
-            </div>
-
-            <div className="share-field-group">
-              <span className="share-field-group-label">Contact details</span>
+              <span className="share-field-group-label">Identity and contact details</span>
               <div className="share-field-grid">
+                <button className="share-field-chip selected locked" disabled><Lock size={13} /><span><strong>Name</strong><small>Always included</small></span><Check size={14} /></button>
                 {detailOptions.map((option) => {
-                  const available = hasValue(profile, option.key, connectionMap);
+                  const available = Boolean(profileFieldValue(profile, option.key).trim());
                   const selected = selectedFields.includes(option.key);
                   return (
                     <button
@@ -302,30 +413,6 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
                 {selectedFields.includes('eventName') && <Check size={14} />}
               </button>
             </div>
-
-            <div className="share-field-group">
-              <span className="share-field-group-label">Social profiles</span>
-              <div className="social-field-grid">
-                {allSocialPlatforms.map((platform) => {
-                  const key: ShareFieldKey = `social:${platform}`;
-                  const available = hasValue(profile, key, connectionMap);
-                  const selected = selectedFields.includes(key);
-                  return (
-                    <button
-                      className={`social-field-chip${selected ? ' selected' : ''}${available ? '' : ' unavailable'}`}
-                      key={platform}
-                      disabled={!available}
-                      onClick={() => toggleField(key)}
-                    >
-                      <PlatformMark platform={platform} size="sm" />
-                      <span>{platform}</span>
-                      {selected && <Check size={13} />}
-                    </button>
-                  );
-                })}
-              </div>
-              <small className="field-selector-footnote">Unavailable profiles can be added under Social Accounts.</small>
-            </div>
           </div>
 
           <div className={`share-card share-card-${mode}`}>
@@ -338,19 +425,27 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
             <p>{cardSubtitle || 'Only the fields you selected will be shared'}</p>
 
             <div className="qr-stage">
-              <QRCodeSVG value={shareUrl} size={218} level="M" marginSize={2} title={`${mode} TagOnce card for ${profile.displayName}`} />
+              <QRCodeSVG value={shareUrl} size={228} level="L" marginSize={2} title={`${mode} TagOnce card for ${profile.displayName}`} />
               <span><QrCode size={15} /> Scan with any phone camera</span>
+            </div>
+
+            <div className="share-card-social-links">
+              {activeSocialEntries.map(([platform, identity]) => {
+                const url = socialProfileUrl(platform, identity);
+                return (
+                  <a href={url} target="_blank" rel="noreferrer" key={platform}>
+                    <PlatformMark platform={platform} size="sm" />
+                    <span><strong>{socialDisplay(identity) || socialPlatformMeta[platform].label}</strong><small>{socialPlatformMeta[platform].action}</small></span>
+                    <ExternalLink size={14} />
+                  </a>
+                );
+              })}
+              {activeSocialEntries.length === 0 && <span className="no-shared-socials">Select a social profile to place a clickable link on this card.</span>}
             </div>
 
             <div className="shared-field-summary">
               <span>{activeDetails + activeSocials} selected fields</span>
-              <strong>{activeSocials} social {activeSocials === 1 ? 'identity' : 'identities'}</strong>
-            </div>
-
-            <div className="card-social-row">
-              {allSocialPlatforms.map((platform) => (
-                <span className={payload.socials[platform] ? 'ready' : ''} key={platform}><PlatformMark platform={platform} size="sm" /></span>
-              ))}
+              <strong>{activeSocials} clickable social {activeSocials === 1 ? 'link' : 'links'}</strong>
             </div>
           </div>
 
@@ -359,7 +454,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
             <button className="button secondary" onClick={() => downloadVCard(payload)}><Download size={17} /> Download vCard</button>
           </div>
           <p className="card-handoff-note">
-            The QR updates instantly as fields are selected or removed. Recipients can preview the exact card before saving it.
+            The QR page and vCard contain the same selected details. Recipients can save the contact or jump directly to each shared profile.
           </p>
         </section>
       </div>
