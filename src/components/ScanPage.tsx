@@ -1,10 +1,13 @@
 import {
+  CalendarCheck,
   Camera,
   Check,
   ContactRound,
   Download,
   ExternalLink,
   ImagePlus,
+  Loader2,
+  LocateFixed,
   MapPin,
   ScanLine,
   ShieldCheck,
@@ -44,6 +47,12 @@ interface InitialScanState {
   error: string;
 }
 
+interface ReverseGeocodeResult {
+  display_name?: string;
+  name?: string;
+  address?: Record<string, string | undefined>;
+}
+
 function getInitialScanState(): InitialScanState {
   const token = new URLSearchParams(window.location.search).get('card') ?? '';
   if (!token) return { input: '', payload: null, error: '' };
@@ -73,6 +82,44 @@ function cardContext(payload: ShareCardPayload) {
   return 'Personal connection';
 }
 
+function conciseLocation(result: ReverseGeocodeResult, latitude: number, longitude: number) {
+  const address = result.address ?? {};
+  const landmark = result.name
+    || address.amenity
+    || address.building
+    || address.tourism
+    || address.leisure
+    || address.shop
+    || address.road;
+  const locality = address.city
+    || address.town
+    || address.village
+    || address.suburb
+    || address.county;
+  const region = address.state;
+  const parts = [landmark, locality, region].filter(
+    (value, index, values): value is string => Boolean(value && values.indexOf(value) === index),
+  );
+  return parts.join(', ')
+    || result.display_name
+    || `Current location (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`;
+}
+
+async function reverseGeocode(latitude: number, longitude: number) {
+  const params = new URLSearchParams({
+    format: 'jsonv2',
+    lat: String(latitude),
+    lon: String(longitude),
+    zoom: '18',
+    addressdetails: '1',
+  });
+  const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) throw new Error('The place name could not be resolved.');
+  return response.json() as Promise<ReverseGeocodeResult>;
+}
+
 export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
   const [initial] = useState(getInitialScanState);
   const [input, setInput] = useState(initial.input);
@@ -82,6 +129,9 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
   const [notes, setNotes] = useState('');
   const [memoryPhoto, setMemoryPhoto] = useState('');
   const [photoError, setPhotoError] = useState('');
+  const [locationError, setLocationError] = useState('');
+  const [locationNote, setLocationNote] = useState('');
+  const [locating, setLocating] = useState(false);
   const [saved, setSaved] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -107,6 +157,8 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
       setPayload(decoded);
       setMetAt(decoded.eventName ?? '');
       setError('');
+      setLocationError('');
+      setLocationNote(decoded.eventName ? 'Event context filled from this TagOnce card.' : '');
       setSaved(false);
     } catch (openError) {
       setPayload(null);
@@ -114,7 +166,7 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
     }
   }
 
-  async function captureMemory(file: File | undefined, input?: HTMLInputElement | null) {
+  async function captureMemory(file: File | undefined, inputElement?: HTMLInputElement | null) {
     if (!file) return;
     try {
       setMemoryPhoto(await compressImage(file));
@@ -122,8 +174,52 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
     } catch (captureError) {
       setPhotoError(captureError instanceof Error ? captureError.message : 'The photo could not be saved.');
     } finally {
-      if (input) input.value = '';
+      if (inputElement) inputElement.value = '';
     }
+  }
+
+  function useCurrentLocation() {
+    setLocationError('');
+    setLocationNote('');
+    if (!navigator.geolocation) {
+      setLocationError('Location is not available in this browser. You can still type the venue manually.');
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        const fallback = `Current location (${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)})`;
+        try {
+          const result = await reverseGeocode(coords.latitude, coords.longitude);
+          setMetAt(conciseLocation(result, coords.latitude, coords.longitude));
+          setLocationNote('Current place added from this device. You can edit it before saving.');
+        } catch {
+          setMetAt(fallback);
+          setLocationNote('GPS coordinates added. Rename the place if you recognize the venue.');
+        } finally {
+          setLocating(false);
+        }
+      },
+      (locationFailure) => {
+        setLocating(false);
+        if (locationFailure.code === locationFailure.PERMISSION_DENIED) {
+          setLocationError('Location permission was not granted. Your location was not saved.');
+        } else if (locationFailure.code === locationFailure.TIMEOUT) {
+          setLocationError('Location lookup timed out. Try again or enter the venue manually.');
+        } else {
+          setLocationError('Your current location could not be determined.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
+    );
+  }
+
+  function useEventContext() {
+    if (!payload?.eventName) return;
+    setMetAt(payload.eventName);
+    setLocationError('');
+    setLocationNote('Event context restored from the scanned TagOnce card.');
   }
 
   function saveContact() {
@@ -179,6 +275,8 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
     setMemoryPhoto('');
     setNotes('');
     setMetAt('');
+    setLocationError('');
+    setLocationNote('');
   }
 
   return (
@@ -288,7 +386,27 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
             </div>
             {photoError && <div className="inline-error">{photoError}</div>}
 
-            <label className="field"><span>Where did you meet?</span><div className="input-with-icon"><MapPin size={16} /><input value={metAt} onChange={(event) => setMetAt(event.target.value)} placeholder="Event, venue or introduction" /></div></label>
+            <div className="meeting-context-field">
+              <label className="field">
+                <span>Where did you meet?</span>
+                <div className="input-with-icon"><MapPin size={16} /><input value={metAt} onChange={(event) => setMetAt(event.target.value)} placeholder="Event, venue or introduction" /></div>
+              </label>
+              <div className="meeting-context-actions">
+                <button className="meeting-context-button" disabled={locating} onClick={useCurrentLocation}>
+                  {locating ? <Loader2 className="spin" size={15} /> : <LocateFixed size={15} />}
+                  {locating ? 'Finding place…' : 'Use current location'}
+                </button>
+                {payload.eventName && (
+                  <button className="meeting-context-button event-context-button" onClick={useEventContext}>
+                    <CalendarCheck size={15} /> Use event: {payload.eventName}
+                  </button>
+                )}
+              </div>
+              <small className="location-privacy-note">GPS is requested only when you tap the button. Review or edit the result before saving.</small>
+              {locationNote && <div className="location-status-note">{locationNote}</div>}
+              {locationError && <div className="inline-error">{locationError}</div>}
+            </div>
+
             <label className="field"><span>What should you remember?</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="What they do, what you discussed, and the next step..." /></label>
 
             <button className="button primary full-button" disabled={expired || saved} onClick={saveContact}>
