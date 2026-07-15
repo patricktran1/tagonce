@@ -1,14 +1,6 @@
-import {
-  createCipheriv,
-  createDecipheriv,
-  createHash,
-  randomBytes,
-} from 'node:crypto';
-
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events.readonly';
 export const SESSION_COOKIE = 'tagonce_calendar_session';
 export const STATE_COOKIE = 'tagonce_calendar_state';
-export const RETURN_COOKIE = 'tagonce_calendar_return';
 
 export interface CalendarConfig {
   clientId: string;
@@ -86,33 +78,64 @@ export function clearCookie(name: string) {
   return serializeCookie(name, '', { maxAge: 0 });
 }
 
-function encryptionKey(secret: string) {
-  return createHash('sha256').update(secret).digest();
+function getWebCrypto() {
+  const cryptoApi = globalThis.crypto;
+  if (!cryptoApi?.subtle) throw new Error('Secure crypto is unavailable in this runtime.');
+  return cryptoApi;
 }
 
-export function encryptSession(session: CalendarSession, secret: string) {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', encryptionKey(secret), iv);
-  const ciphertext = Buffer.concat([
-    cipher.update(JSON.stringify(session), 'utf8'),
-    cipher.final(),
-  ]);
-  const tag = cipher.getAuthTag();
-  return Buffer.concat([iv, tag, ciphertext]).toString('base64url');
+function encodeBase64Url(bytes: Uint8Array) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
-export function decryptSession(value: string | undefined, secret: string): CalendarSession | null {
+function decodeBase64Url(value: string) {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+async function encryptionKey(secret: string) {
+  const cryptoApi = getWebCrypto();
+  const digest = await cryptoApi.subtle.digest('SHA-256', new TextEncoder().encode(secret));
+  return cryptoApi.subtle.importKey('raw', digest, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+export async function encryptSession(session: CalendarSession, secret: string) {
+  const cryptoApi = getWebCrypto();
+  const iv = cryptoApi.getRandomValues(new Uint8Array(12));
+  const plaintext = new TextEncoder().encode(JSON.stringify(session));
+  const ciphertext = new Uint8Array(await cryptoApi.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    await encryptionKey(secret),
+    plaintext,
+  ));
+  const packed = new Uint8Array(iv.length + ciphertext.length);
+  packed.set(iv, 0);
+  packed.set(ciphertext, iv.length);
+  return encodeBase64Url(packed);
+}
+
+export async function decryptSession(value: string | undefined, secret: string): Promise<CalendarSession | null> {
   if (!value) return null;
   try {
-    const packed = Buffer.from(value, 'base64url');
+    const packed = decodeBase64Url(value);
     if (packed.length < 29) return null;
-    const iv = packed.subarray(0, 12);
-    const tag = packed.subarray(12, 28);
-    const ciphertext = packed.subarray(28);
-    const decipher = createDecipheriv('aes-256-gcm', encryptionKey(secret), iv);
-    decipher.setAuthTag(tag);
-    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
-    const session = JSON.parse(plaintext) as CalendarSession;
+    const iv = packed.slice(0, 12);
+    const ciphertext = packed.slice(12);
+    const plaintext = await getWebCrypto().subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      await encryptionKey(secret),
+      ciphertext,
+    );
+    const session = JSON.parse(new TextDecoder().decode(plaintext)) as CalendarSession;
     return session.accessToken && Number.isFinite(session.expiresAt) ? session : null;
   } catch {
     return null;
@@ -120,18 +143,13 @@ export function decryptSession(value: string | undefined, secret: string): Calen
 }
 
 export function randomState() {
-  return randomBytes(24).toString('base64url');
+  return encodeBase64Url(getWebCrypto().getRandomValues(new Uint8Array(24)));
 }
 
-export function safeReturnTo(value: string | null) {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/?calendar=connected';
-  return value;
-}
-
-export function withCalendarResult(returnTo: string, result: string) {
-  const url = new URL(returnTo, 'https://tagonce.local');
+export function withCalendarResult(result: string) {
+  const url = new URL('/', 'https://tagonce.local');
   url.searchParams.set('calendar', result);
-  return `${url.pathname}${url.search}${url.hash}`;
+  return `${url.pathname}${url.search}`;
 }
 
 export async function exchangeAuthorizationCode(
@@ -186,8 +204,8 @@ export async function refreshCalendarSession(
   };
 }
 
-export function sessionCookie(session: CalendarSession, secret: string) {
-  return serializeCookie(SESSION_COOKIE, encryptSession(session, secret), {
+export async function sessionCookie(session: CalendarSession, secret: string) {
+  return serializeCookie(SESSION_COOKIE, await encryptSession(session, secret), {
     maxAge: 60 * 60 * 24 * 180,
   });
 }
