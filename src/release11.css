@@ -83,6 +83,45 @@
 .live-event-connect p { margin: 0 0 16px; color: #77717d; line-height: 1.55; }
 .live-event-connect .calendar-detection-icon { width: 54px; height: 54px; }
 
+.calendar-account-connect {
+  display: grid;
+  gap: 9px;
+  max-width: 590px;
+}
+
+.calendar-account-connect label {
+  color: #3b3440;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.calendar-account-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+}
+
+.calendar-account-row input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #d9d1df;
+  border-radius: 12px;
+  background: #fff;
+  padding: 11px 12px;
+  font: inherit;
+  color: #2c2631;
+  outline: none;
+}
+
+.calendar-account-row input:focus {
+  border-color: rgba(120, 83, 219, 0.7);
+  box-shadow: 0 0 0 3px rgba(120, 83, 219, 0.1);
+}
+
+.calendar-account-row .button { white-space: nowrap; }
+.calendar-account-help { color: #8a828f; font-size: 11px; line-height: 1.45; }
+.calendar-choose-account { justify-self: start; margin-top: 2px; }
+
 .live-event-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -170,6 +209,8 @@
   .live-event-orbit { width: 62px; height: 62px; flex-basis: 62px; border-radius: 20px; }
   .live-event-panel { padding: 16px; }
   .live-event-connect { grid-template-columns: 1fr; }
+  .calendar-account-row { grid-template-columns: 1fr; }
+  .calendar-account-row .button { width: 100%; justify-content: center; }
   .live-event-explainer { align-items: flex-start; flex-direction: column; }
   .live-event-explainer strong { white-space: normal; }
 }
