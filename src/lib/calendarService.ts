@@ -29,6 +29,7 @@ interface GoogleTokenResponse {
 interface StoredCalendarToken {
   accessToken: string;
   expiresAt: number;
+  clientId: string;
   scope?: string;
 }
 
@@ -75,54 +76,39 @@ declare global {
 
 const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events.readonly';
 const GOOGLE_SCRIPT_ID = 'tagonce-google-identity';
-const TOKEN_KEY = 'tagonce.google.calendar.token.v2';
-const CLIENT_ID_KEY = 'tagonce.google.calendar.client-id.v1';
+const TOKEN_KEY = 'tagonce.google.calendar.token.v3';
+const LEGACY_TOKEN_KEY = 'tagonce.google.calendar.token.v2';
+const LEGACY_CLIENT_ID_KEY = 'tagonce.google.calendar.client-id.v1';
 let scriptPromise: Promise<void> | null = null;
 
-function environmentClientId() {
+function configuredClientId() {
   const environment = import.meta.env as Record<string, string | undefined>;
   return environment.VITE_GOOGLE_CALENDAR_CLIENT_ID?.trim() || '';
 }
 
-export function getGoogleCalendarClientId() {
-  if (environmentClientId()) return environmentClientId();
+function clearLegacyDeveloperConfig() {
   try {
-    return window.localStorage.getItem(CLIENT_ID_KEY)?.trim() || '';
+    window.localStorage.removeItem(LEGACY_CLIENT_ID_KEY);
+    window.localStorage.removeItem(LEGACY_TOKEN_KEY);
   } catch {
-    return '';
+    // Storage may be unavailable in private or restricted browser contexts.
   }
-}
-
-export function saveGoogleCalendarClientId(clientId: string) {
-  const normalized = clientId.trim();
-  try {
-    if (normalized) window.localStorage.setItem(CLIENT_ID_KEY, normalized);
-    else window.localStorage.removeItem(CLIENT_ID_KEY);
-  } catch {
-    // The environment variable remains the preferred production configuration.
-  }
-}
-
-function requestClientId() {
-  const existing = getGoogleCalendarClientId();
-  if (existing) return existing;
-  const entered = window.prompt(
-    'Paste the Google OAuth Client ID for TagOnce. This is the public value ending in apps.googleusercontent.com, not the client secret.',
-  )?.trim() || '';
-  if (!entered) throw new Error('Google Calendar connection was cancelled.');
-  if (!entered.endsWith('.apps.googleusercontent.com')) {
-    throw new Error('That does not look like a Google OAuth Client ID.');
-  }
-  saveGoogleCalendarClientId(entered);
-  return entered;
 }
 
 function readToken(): StoredCalendarToken | null {
+  const clientId = configuredClientId();
+  if (!clientId) return null;
+
   try {
     const raw = window.localStorage.getItem(TOKEN_KEY);
     if (!raw) return null;
     const token = JSON.parse(raw) as StoredCalendarToken;
-    if (!token.accessToken || !Number.isFinite(token.expiresAt) || token.expiresAt <= Date.now() + 30_000) {
+    if (
+      !token.accessToken
+      || token.clientId !== clientId
+      || !Number.isFinite(token.expiresAt)
+      || token.expiresAt <= Date.now() + 30_000
+    ) {
       window.localStorage.removeItem(TOKEN_KEY);
       return null;
     }
@@ -132,11 +118,14 @@ function readToken(): StoredCalendarToken | null {
   }
 }
 
-function saveToken(response: GoogleTokenResponse) {
-  if (!response.access_token) throw new Error(response.error_description || response.error || 'Google returned no access token.');
+function saveToken(response: GoogleTokenResponse, clientId: string) {
+  if (!response.access_token) {
+    throw new Error(response.error_description || response.error || 'Google returned no access token.');
+  }
   const token: StoredCalendarToken = {
     accessToken: response.access_token,
     expiresAt: Date.now() + Math.max(60, response.expires_in || 3600) * 1000,
+    clientId,
     scope: response.scope,
   };
   window.localStorage.setItem(TOKEN_KEY, JSON.stringify(token));
@@ -172,13 +161,33 @@ function loadGoogleIdentityScript() {
   return scriptPromise;
 }
 
+function authorizationFailure(error: unknown) {
+  if (error && typeof error === 'object' && 'type' in error) {
+    const type = String((error as { type?: unknown }).type || '');
+    if (type === 'popup_failed_to_open') return new Error('Google sign-in was blocked by the browser. Allow pop-ups for TagOnce and try again.');
+    if (type === 'popup_closed') return new Error('Google Calendar connection was cancelled.');
+  }
+  return new Error('Google Calendar authorization was cancelled or blocked.');
+}
+
 export async function getCalendarStatus(): Promise<CalendarStatusResponse> {
+  clearLegacyDeveloperConfig();
+  const clientId = configuredClientId();
+  if (!clientId) return { configured: false, connected: false };
   const token = readToken();
   return { configured: true, connected: Boolean(token), scope: token?.scope };
 }
 
 export async function authorizeGoogleCalendar() {
-  const clientId = requestClientId();
+  clearLegacyDeveloperConfig();
+  const clientId = configuredClientId();
+  if (!clientId) {
+    throw new Error('Google Calendar is not configured for this TagOnce deployment. The app owner must add VITE_GOOGLE_CALENDAR_CLIENT_ID in Vercel and redeploy.');
+  }
+  if (!clientId.endsWith('.apps.googleusercontent.com')) {
+    throw new Error('The deployed Google OAuth client ID is invalid. The app owner must correct VITE_GOOGLE_CALENDAR_CLIENT_ID in Vercel.');
+  }
+
   await loadGoogleIdentityScript();
   const oauth2 = window.google?.accounts?.oauth2;
   if (!oauth2) throw new Error('Google authorization is unavailable in this browser.');
@@ -189,13 +198,13 @@ export async function authorizeGoogleCalendar() {
       scope: CALENDAR_SCOPE,
       callback: (response) => {
         try {
-          const token = saveToken(response);
+          const token = saveToken(response, clientId);
           resolve({ configured: true, connected: true, scope: token.scope });
         } catch (error) {
           reject(error);
         }
       },
-      error_callback: () => reject(new Error('Google Calendar authorization was cancelled or blocked.')),
+      error_callback: (error) => reject(authorizationFailure(error)),
     });
     client.requestAccessToken({ prompt: 'consent' });
   });
@@ -309,6 +318,11 @@ function rankEvent(event: GoogleCalendarEvent, now: number, requestedEventName: 
 }
 
 export async function getCalendarEventSuggestions(eventName = '') {
+  const clientId = configuredClientId();
+  if (!clientId) {
+    return { configured: false, connected: false, events: [] as CalendarEventSuggestion[] };
+  }
+
   const token = readToken();
   if (!token) {
     return { configured: true, connected: false, events: [] as CalendarEventSuggestion[] };
