@@ -1,7 +1,17 @@
-import { SESSION_COOKIE, clearCookie, json } from './_shared';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import {
+  SESSION_COOKIE,
+  clearCookie,
+  sendJson,
+} from './_shared';
 
-export function POST() {
-  return json(
+export default function handler(request: VercelRequest, response: VercelResponse) {
+  if (request.method !== 'POST') {
+    return sendJson(response, { error: 'Method not allowed' }, 405);
+  }
+
+  return sendJson(
+    response,
     { connected: false },
     200,
     { 'Set-Cookie': clearCookie(SESSION_COOKIE) },
