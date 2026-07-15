@@ -30,7 +30,7 @@
     },
     {
       "source": "/api/google-calendar/active-event",
-      "destination": "/api/calendar-connect?action=events"
+      "destination": "/api/calendar-events"
     },
     {
       "source": "/api/google-calendar/disconnect",
