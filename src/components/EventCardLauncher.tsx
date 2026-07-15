@@ -32,6 +32,19 @@ const relevanceLabels: Record<CalendarEventSuggestion['relevance'], string> = {
   today: 'Today',
 };
 
+const oauthResultMessages: Record<string, string> = {
+  cancelled: 'Google Calendar connection was cancelled.',
+  invalid_state: 'Google returned to TagOnce, but the secure authorization state was invalid or expired. Start the connection again.',
+  authorization_incomplete: 'Google returned without a complete authorization code. Start the connection again.',
+  client_credentials: 'The Google client secret in Vercel does not match the OAuth client ID. Replace GOOGLE_CALENDAR_CLIENT_SECRET with the secret from the same Google OAuth client.',
+  redirect_mismatch: 'Google rejected the callback address. Confirm the OAuth client contains https://tagonce.vercel.app/api/google-calendar/callback.',
+  authorization_expired: 'The Google authorization code expired before it could be exchanged. Start the connection again.',
+  token_exchange: 'Google approved access, but TagOnce could not exchange the authorization code. Check the client secret and retry.',
+  session_error: 'Google approved access, but TagOnce could not create the encrypted Calendar session.',
+  google_error: 'Google returned an authorization error. Start the connection again.',
+  unconfigured: 'The TagOnce deployment is missing one or more Google Calendar environment variables.',
+};
+
 function eventTimeLabel(event: CalendarEventSuggestion) {
   const start = new Date(event.start);
   const end = new Date(event.end);
@@ -88,21 +101,28 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
   useEffect(() => {
     let cancelled = false;
     async function initialize() {
-      const oauthResult = new URLSearchParams(window.location.search).get('calendar');
-      if (oauthResult === 'cancelled') setError('Google Calendar connection was cancelled.');
-      if (oauthResult && !['connected', 'cancelled'].includes(oauthResult)) {
-        setError('Google Calendar could not be connected. Check the OAuth redirect setup and try again.');
-      }
+      const oauthResult = new URLSearchParams(window.location.search).get('calendar') || '';
+      const callbackMessage = oauthResultMessages[oauthResult] || (
+        oauthResult && oauthResult !== 'connected'
+          ? `Google Calendar returned an unexpected result: ${oauthResult}.`
+          : ''
+      );
 
       try {
         const status = await getCalendarStatus();
         if (cancelled) return;
         if (!status.configured) {
           setState('unconfigured');
+          setError(callbackMessage || oauthResultMessages.unconfigured);
           return;
         }
         if (!status.connected) {
           setState('disconnected');
+          if (oauthResult === 'connected') {
+            setError('Google approved Calendar access, but TagOnce could not read the new secure session cookie. Reload once in a normal browser window and reconnect.');
+          } else if (callbackMessage) {
+            setError(callbackMessage);
+          }
           return;
         }
         await loadEvents();
@@ -186,7 +206,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
             <span className="calendar-detection-icon"><CalendarDays size={22} /></span>
             <div>
               <h3>Calendar connection is temporarily unavailable</h3>
-              <p>The TagOnce deployment needs its Google OAuth client secret and callback configuration. No user setup is required.</p>
+              <p>The TagOnce deployment needs its Google OAuth client secret and session configuration. No user setup is required.</p>
             </div>
           </div>
         )}
@@ -228,8 +248,8 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
         {state === 'connected' && !loading && events.length === 0 && (
           <div className="live-event-empty">
             <CalendarDays size={24} />
-            <strong>No nearby event found</strong>
-            <span>Create a timed event happening now or within the next three hours, then refresh.</span>
+            <strong>Calendar connected</strong>
+            <span>No nearby event was found. Create a timed event happening now or within the next three hours, then refresh.</span>
           </div>
         )}
 
