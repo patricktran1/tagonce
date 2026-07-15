@@ -1,4 +1,4 @@
-export type CalendarConnectionState = 'checking' | 'connected' | 'disconnected' | 'unconfigured';
+export type CalendarConnectionState = 'checking' | 'connecting' | 'connected' | 'disconnected' | 'unconfigured';
 
 export interface CalendarStatusResponse {
   configured: boolean;
@@ -18,82 +18,318 @@ export interface CalendarEventSuggestion {
   matchesCard: boolean;
 }
 
-interface CalendarEventResponse extends CalendarStatusResponse {
-  checkedAt?: string;
-  events: CalendarEventSuggestion[];
-  reconnect?: boolean;
+interface GoogleTokenResponse {
+  access_token?: string;
+  expires_in?: number;
+  scope?: string;
   error?: string;
+  error_description?: string;
 }
 
-const CALENDAR_RETURN_KEY = 'tagonce.calendar.return.v1';
-
-async function readJson<T>(response: Response) {
-  const payload = await response.json().catch(() => ({})) as T;
-  return { response, payload };
+interface StoredCalendarToken {
+  accessToken: string;
+  expiresAt: number;
+  scope?: string;
 }
 
-export function restoreGoogleCalendarReturn() {
-  if (typeof window === 'undefined') return;
-  const current = new URL(window.location.href);
-  const result = current.searchParams.get('calendar');
-  if (!result || current.searchParams.has('card')) return;
+interface GoogleCalendarEvent {
+  id?: string;
+  summary?: string;
+  description?: string;
+  location?: string;
+  htmlLink?: string;
+  status?: string;
+  eventType?: string;
+  transparency?: string;
+  start?: { dateTime?: string; date?: string };
+  end?: { dateTime?: string; date?: string };
+  attendees?: Array<{ self?: boolean; responseStatus?: string }>;
+}
 
-  const saved = window.sessionStorage.getItem(CALENDAR_RETURN_KEY);
-  if (!saved) return;
-  window.sessionStorage.removeItem(CALENDAR_RETURN_KEY);
+interface GoogleCalendarListResponse {
+  items?: GoogleCalendarEvent[];
+  error?: { message?: string };
+}
 
+interface GoogleTokenClient {
+  callback: (response: GoogleTokenResponse) => void;
+  error_callback?: (error: unknown) => void;
+  requestAccessToken: (options?: { prompt?: string }) => void;
+}
+
+interface GoogleOauth2Api {
+  initTokenClient: (options: {
+    client_id: string;
+    scope: string;
+    callback: (response: GoogleTokenResponse) => void;
+    error_callback?: (error: unknown) => void;
+  }) => GoogleTokenClient;
+  revoke: (token: string, callback?: () => void) => void;
+}
+
+declare global {
+  interface Window {
+    google?: { accounts?: { oauth2?: GoogleOauth2Api } };
+  }
+}
+
+const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events.readonly';
+const GOOGLE_SCRIPT_ID = 'tagonce-google-identity';
+const TOKEN_KEY = 'tagonce.google.calendar.token.v2';
+const CLIENT_ID_KEY = 'tagonce.google.calendar.client-id.v1';
+let scriptPromise: Promise<void> | null = null;
+
+function environmentClientId() {
+  const environment = import.meta.env as Record<string, string | undefined>;
+  return environment.VITE_GOOGLE_CALENDAR_CLIENT_ID?.trim() || '';
+}
+
+export function getGoogleCalendarClientId() {
+  if (environmentClientId()) return environmentClientId();
   try {
-    const target = new URL(saved, window.location.origin);
-    if (target.origin !== window.location.origin) return;
-    target.searchParams.set('calendar', result);
-    window.history.replaceState({}, '', `${target.pathname}${target.search}${target.hash}`);
+    return window.localStorage.getItem(CLIENT_ID_KEY)?.trim() || '';
   } catch {
-    // Ignore an invalid saved return path and remain on the current page.
+    return '';
   }
 }
 
-export async function getCalendarStatus() {
-  const { response, payload } = await readJson<CalendarStatusResponse>(
-    await fetch('/api/google-calendar/status', { credentials: 'include', cache: 'no-store' }),
-  );
-  if (!response.ok) throw new Error('Calendar connection status could not be checked.');
-  return payload;
-}
-
-export async function getCalendarEventSuggestions(eventName = '') {
-  const params = new URLSearchParams();
-  if (eventName.trim()) params.set('eventName', eventName.trim());
-  const suffix = params.size ? `?${params.toString()}` : '';
-  const { response, payload } = await readJson<CalendarEventResponse>(
-    await fetch(`/api/google-calendar/active-event${suffix}`, {
-      credentials: 'include',
-      cache: 'no-store',
-    }),
-  );
-
-  if (!response.ok && response.status !== 401) {
-    throw new Error(payload.error || 'Calendar events could not be loaded.');
-  }
-  return payload;
-}
-
-export function connectGoogleCalendar() {
-  const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+export function saveGoogleCalendarClientId(clientId: string) {
+  const normalized = clientId.trim();
   try {
-    window.sessionStorage.setItem(CALENDAR_RETURN_KEY, returnTo);
+    if (normalized) window.localStorage.setItem(CLIENT_ID_KEY, normalized);
+    else window.localStorage.removeItem(CLIENT_ID_KEY);
   } catch {
-    // OAuth still works; only automatic return to the scanned card may be unavailable.
+    // The environment variable remains the preferred production configuration.
   }
-  window.location.assign('/api/google-calendar/connect');
+}
+
+function readToken(): StoredCalendarToken | null {
+  try {
+    const raw = window.localStorage.getItem(TOKEN_KEY);
+    if (!raw) return null;
+    const token = JSON.parse(raw) as StoredCalendarToken;
+    if (!token.accessToken || !Number.isFinite(token.expiresAt) || token.expiresAt <= Date.now() + 30_000) {
+      window.localStorage.removeItem(TOKEN_KEY);
+      return null;
+    }
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+function saveToken(response: GoogleTokenResponse) {
+  if (!response.access_token) throw new Error(response.error_description || response.error || 'Google returned no access token.');
+  const token: StoredCalendarToken = {
+    accessToken: response.access_token,
+    expiresAt: Date.now() + Math.max(60, response.expires_in || 3600) * 1000,
+    scope: response.scope,
+  };
+  window.localStorage.setItem(TOKEN_KEY, JSON.stringify(token));
+  return token;
+}
+
+function loadGoogleIdentityScript() {
+  if (window.google?.accounts?.oauth2) return Promise.resolve();
+  if (scriptPromise) return scriptPromise;
+
+  scriptPromise = new Promise<void>((resolve, reject) => {
+    const existing = document.getElementById(GOOGLE_SCRIPT_ID) as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Google authorization could not be loaded.')), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = GOOGLE_SCRIPT_ID;
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Google authorization could not be loaded.'));
+    document.head.appendChild(script);
+  });
+
+  return scriptPromise;
+}
+
+export async function getCalendarStatus(): Promise<CalendarStatusResponse> {
+  const configured = Boolean(getGoogleCalendarClientId());
+  const token = configured ? readToken() : null;
+  return { configured, connected: Boolean(token), scope: token?.scope };
+}
+
+export async function connectGoogleCalendar() {
+  const clientId = getGoogleCalendarClientId();
+  if (!clientId) throw new Error('Add the Google OAuth client ID first.');
+  await loadGoogleIdentityScript();
+  const oauth2 = window.google?.accounts?.oauth2;
+  if (!oauth2) throw new Error('Google authorization is unavailable in this browser.');
+
+  return new Promise<CalendarStatusResponse>((resolve, reject) => {
+    const client = oauth2.initTokenClient({
+      client_id: clientId,
+      scope: CALENDAR_SCOPE,
+      callback: (response) => {
+        try {
+          const token = saveToken(response);
+          resolve({ configured: true, connected: true, scope: token.scope });
+        } catch (error) {
+          reject(error);
+        }
+      },
+      error_callback: () => reject(new Error('Google Calendar authorization was cancelled or blocked.')),
+    });
+    client.requestAccessToken({ prompt: 'consent' });
+  });
 }
 
 export async function disconnectGoogleCalendar() {
-  const { response } = await readJson<{ connected: boolean }>(
-    await fetch('/api/google-calendar/disconnect', {
-      method: 'POST',
-      credentials: 'include',
-      cache: 'no-store',
-    }),
-  );
-  if (!response.ok) throw new Error('Google Calendar could not be disconnected.');
+  const token = readToken();
+  try {
+    window.localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // The in-memory connection is still considered disconnected.
+  }
+
+  if (!token) return;
+  await loadGoogleIdentityScript().catch(() => undefined);
+  await new Promise<void>((resolve) => {
+    const revoke = window.google?.accounts?.oauth2?.revoke;
+    if (!revoke) {
+      resolve();
+      return;
+    }
+    revoke(token.accessToken, resolve);
+  });
+}
+
+function eventTime(value: { dateTime?: string; date?: string } | undefined, end = false) {
+  if (value?.dateTime) return Date.parse(value.dateTime);
+  if (value?.date) {
+    const date = new Date(`${value.date}T00:00:00`);
+    if (end) date.setMilliseconds(date.getMilliseconds() - 1);
+    return date.getTime();
+  }
+  return Number.NaN;
+}
+
+function normalize(value = '') {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function eventNameMatch(summary: string, requested: string) {
+  const left = normalize(summary);
+  const right = normalize(requested);
+  return Boolean(left && right && (left.includes(right) || right.includes(left)));
+}
+
+function sameLocalDay(left: number, right: number) {
+  const a = new Date(left);
+  const b = new Date(right);
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
+function declined(event: GoogleCalendarEvent) {
+  return event.attendees?.some((attendee) => attendee.self && attendee.responseStatus === 'declined') ?? false;
+}
+
+function rankEvent(event: GoogleCalendarEvent, now: number, requestedEventName: string) {
+  const start = eventTime(event.start);
+  const end = eventTime(event.end, true);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+
+  const startsIn = (start - now) / 60_000;
+  const endedAgo = (now - end) / 60_000;
+  let relevance: CalendarEventSuggestion['relevance'];
+  let score: number;
+
+  if (start <= now && end >= now) {
+    relevance = 'happening_now';
+    score = 140;
+  } else if (startsIn > 0 && startsIn <= 180) {
+    relevance = 'starting_soon';
+    score = 105 - startsIn / 6;
+  } else if (endedAgo > 0 && endedAgo <= 120) {
+    relevance = 'recently_ended';
+    score = 80 - endedAgo / 6;
+  } else if (sameLocalDay(start, now)) {
+    relevance = 'today';
+    score = 40;
+  } else {
+    return null;
+  }
+
+  const title = event.summary?.trim() || 'Calendar event';
+  if (event.location?.trim()) score += 18;
+  if (requestedEventName && eventNameMatch(title, requestedEventName)) score += 55;
+  if (event.eventType === 'fromGmail') score += 6;
+  if (event.transparency === 'transparent') score -= 15;
+  if (event.start?.date) score -= 12;
+
+  return {
+    id: event.id || `${title}-${start}`,
+    title,
+    location: event.location?.trim() || '',
+    description: event.description?.trim() || '',
+    start: new Date(start).toISOString(),
+    end: new Date(end).toISOString(),
+    htmlLink: event.htmlLink,
+    relevance,
+    matchesCard: Boolean(requestedEventName && eventNameMatch(title, requestedEventName)),
+    score,
+  };
+}
+
+export async function getCalendarEventSuggestions(eventName = '') {
+  const token = readToken();
+  if (!token) {
+    return { configured: Boolean(getGoogleCalendarClientId()), connected: false, events: [] as CalendarEventSuggestion[] };
+  }
+
+  const now = Date.now();
+  const params = new URLSearchParams({
+    timeMin: new Date(now - 6 * 60 * 60 * 1000).toISOString(),
+    timeMax: new Date(now + 10 * 60 * 60 * 1000).toISOString(),
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    maxResults: '50',
+    showDeleted: 'false',
+  });
+
+  const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token.accessToken}` },
+    cache: 'no-store',
+  });
+  const payload = await response.json().catch(() => ({})) as GoogleCalendarListResponse;
+
+  if (response.status === 401 || response.status === 403) {
+    window.localStorage.removeItem(TOKEN_KEY);
+    return {
+      configured: true,
+      connected: false,
+      events: [] as CalendarEventSuggestion[],
+      reconnect: true,
+      error: payload.error?.message || 'Google Calendar needs to be reconnected.',
+    };
+  }
+  if (!response.ok) throw new Error(payload.error?.message || 'Calendar events could not be loaded.');
+
+  const events = (payload.items || [])
+    .filter((event) => event.status !== 'cancelled' && !declined(event))
+    .map((event) => rankEvent(event, now, eventName.trim()))
+    .filter((event): event is NonNullable<typeof event> => Boolean(event))
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 3)
+    .map(({ score: _score, ...event }) => event);
+
+  return {
+    configured: true,
+    connected: true,
+    checkedAt: new Date(now).toISOString(),
+    events,
+  };
 }
