@@ -91,7 +91,6 @@ export default {
       scope: GOOGLE_SCOPES,
       access_type: 'offline',
       include_granted_scopes: 'true',
-      prompt: 'consent',
       state,
     };
     if (loginHint) authorizationParams.login_hint = loginHint;
