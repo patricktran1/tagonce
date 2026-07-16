@@ -1,0 +1,26 @@
+/* Release 0.24: simplified account menu and platform-neutral event links */
+.account-menu .account-menu-section:last-child {
+  border-bottom: 0;
+}
+
+.event-link-support-note {
+  display: block;
+  margin: -2px 2px 0;
+  color: #827789;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.luma-source .event-source-copy {
+  padding-right: 0;
+}
+
+@media (max-width: 760px) {
+  .event-link-support-note {
+    font-size: 12px;
+  }
+
+  .luma-source .event-source-copy {
+    padding-right: 0;
+  }
+}
