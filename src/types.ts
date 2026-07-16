@@ -143,6 +143,11 @@ export interface MyProfile {
   website: string;
   eventName: string;
   eventEndsAt: string;
+  eventStartAt?: string;
+  eventEndAt?: string;
+  eventLocation?: string;
+  eventUrl?: string;
+  eventDescription?: string;
   socialProfiles?: Partial<Record<SocialPlatform, SharedSocialIdentity>>;
   cardSelections?: Partial<Record<CardMode, ShareFieldKey[]>>;
 }
@@ -153,6 +158,10 @@ export interface ShareCardPayload {
   createdAt: string;
   expiresAt?: string;
   eventName?: string;
+  eventStartAt?: string;
+  eventEndAt?: string;
+  eventLocation?: string;
+  eventUrl?: string;
   profile: {
     displayName: string;
     title?: string;
