@@ -80,7 +80,8 @@ async function fetchPublicPage(initialUrl: URL) {
       redirect: 'manual',
       headers: {
         Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.6',
-        'User-Agent': 'Mozilla/5.0 (compatible; TagOnceEventPreview/1.0; +https://tagonce.vercel.app)',
+        'Accept-Language': 'en-US,en;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (compatible; TagOnceEventPreview/1.1; +https://tagonce.vercel.app)',
       },
     });
 
@@ -124,56 +125,109 @@ function cleanText(value: unknown, max = 1200) {
     .slice(0, max);
 }
 
-function dateValue(value: unknown) {
+function firstValue(object: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = object[key];
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return undefined;
+}
+
+function dateValue(value: unknown, depth = 0): string {
+  if (depth > 4 || value === null || value === undefined) return '';
   if (typeof value === 'number') {
     const millis = value < 10_000_000_000 ? value * 1000 : value;
     const date = new Date(millis);
     return Number.isNaN(date.getTime()) ? '' : date.toISOString();
   }
-  if (typeof value !== 'string' || !value.trim()) return '';
-  const date = new Date(value.trim());
-  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+  if (typeof value === 'string') {
+    if (!value.trim()) return '';
+    const date = new Date(value.trim());
+    return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const parsed = dateValue(item, depth + 1);
+      if (parsed) return parsed;
+    }
+    return '';
+  }
+  if (typeof value === 'object') {
+    const object = value as Record<string, unknown>;
+    return dateValue(firstValue(object, [
+      'utc', 'local', 'iso', 'iso8601', 'dateTime', 'datetime', 'date', 'value',
+      'startDate', 'start_time', 'startTime', 'startsAt', 'start_at', 'timestamp',
+    ]), depth + 1);
+  }
+  return '';
 }
 
-function imageValue(value: unknown) {
+function imageValue(value: unknown): string {
   if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return imageValue(value[0]);
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const image = imageValue(item);
+      if (image) return image;
+    }
+    return '';
+  }
   if (value && typeof value === 'object') {
     const object = value as Record<string, unknown>;
-    return cleanText(object.url || object.contentUrl, 1000);
+    return cleanText(firstValue(object, [
+      'url', 'contentUrl', 'secure_url', 'src', 'original', 'large', 'image_url', 'photo_url',
+    ]), 1000);
   }
   return '';
 }
 
 function locationValue(value: unknown): string {
   if (typeof value === 'string') return cleanText(value, 500);
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const location = locationValue(item);
+      if (location) return location;
+    }
+    return '';
+  }
   if (!value || typeof value !== 'object') return '';
   const object = value as Record<string, unknown>;
-  const address = object.address;
-  const pieces = [
+  const address = firstValue(object, ['address', 'venueAddress', 'venue_address', 'postalAddress']);
+  const pieces: unknown[] = [
     object.name,
     object.venue_name,
+    object.venueName,
+    object.title,
     object.description,
     object.full_address,
+    object.fullAddress,
     typeof address === 'string' ? address : undefined,
   ];
   if (address && typeof address === 'object') {
     const addressObject = address as Record<string, unknown>;
     pieces.push(
       addressObject.streetAddress,
+      addressObject.address1,
+      addressObject.address2,
       addressObject.addressLocality,
+      addressObject.city,
       addressObject.addressRegion,
+      addressObject.region,
       addressObject.postalCode,
       addressObject.addressCountry,
+      addressObject.country,
     );
   }
-  const geoAddress = object.geo_address_info;
+  const geoAddress = firstValue(object, ['geo_address_info', 'geoAddressInfo']);
   if (geoAddress && typeof geoAddress === 'object') {
     const geo = geoAddress as Record<string, unknown>;
-    pieces.push(geo.name, geo.address, geo.full_address, geo.city, geo.region);
+    pieces.push(geo.name, geo.address, geo.full_address, geo.fullAddress, geo.city, geo.region);
   }
-  const unique = pieces.map((piece) => cleanText(piece, 300)).filter((piece, index, all) => piece && all.indexOf(piece) === index);
-  return unique.slice(0, 4).join(', ');
+  const nestedVenue = firstValue(object, ['venue', 'primaryVenue', 'primary_venue', 'place']);
+  if (nestedVenue && nestedVenue !== value) pieces.push(locationValue(nestedVenue));
+  const unique = pieces
+    .map((piece) => cleanText(piece, 300))
+    .filter((piece, index, all) => piece && all.indexOf(piece) === index);
+  return unique.slice(0, 5).join(', ');
 }
 
 function eventType(value: unknown) {
@@ -183,27 +237,44 @@ function eventType(value: unknown) {
 }
 
 function objectCandidate(object: Record<string, unknown>, sourceKind: EventPreview['sourceKind']): EventCandidate | null {
-  const typedEvent = eventType(object['@type'] || object.type || object.objectType);
-  const title = object.name || object.title || object.event_name || object.eventName || object.summary;
-  const startAt = object.startDate || object.start_at || object.startAt || object.start_time || object.startTime || object.datetime;
-  const endAt = object.endDate || object.end_at || object.endAt || object.end_time || object.endTime;
-  const location = object.location || object.venue || object.geo_address_info || object.address;
-  const hasEventShape = Boolean(title && (startAt || endAt || location));
+  const typedEvent = eventType(object['@type'] || object.type || object.objectType || object.__typename);
+  const title = firstValue(object, [
+    'name', 'title', 'headline', 'event_name', 'eventName', 'event_title', 'eventTitle', 'summary',
+  ]);
+  const startAt = firstValue(object, [
+    'startDate', 'start_date', 'start_at', 'startAt', 'starts_at', 'startsAt', 'start_time', 'startTime',
+    'event_start', 'eventStart', 'start_timestamp', 'datetime', 'dateTime',
+  ]);
+  const endAt = firstValue(object, [
+    'endDate', 'end_date', 'end_at', 'endAt', 'ends_at', 'endsAt', 'end_time', 'endTime',
+    'event_end', 'eventEnd', 'end_timestamp',
+  ]);
+  const location = firstValue(object, [
+    'location', 'eventLocation', 'event_location', 'venue', 'primaryVenue', 'primary_venue', 'place',
+    'venueAddress', 'venue_address', 'geo_address_info', 'geoAddressInfo', 'address',
+  ]);
+  const hasEventShape = Boolean(title && (dateValue(startAt) || dateValue(endAt) || locationValue(location)));
   if (!typedEvent && !hasEventShape) return null;
   let score = typedEvent ? 50 : 18;
   if (title) score += 18;
-  if (startAt) score += 22;
-  if (endAt) score += 8;
-  if (location) score += 12;
-  if (object.description) score += 4;
+  if (dateValue(startAt)) score += 22;
+  if (dateValue(endAt)) score += 8;
+  if (locationValue(location)) score += 12;
+  if (firstValue(object, ['description', 'event_description', 'eventDescription', 'short_description', 'summary'])) score += 4;
   return {
     title,
     startAt,
     endAt,
     location,
-    description: object.description || object.event_description || object.eventDescription,
-    imageUrl: object.image || object.cover_url || object.coverUrl || object.photo,
-    url: object.url || object.event_url || object.eventUrl,
+    description: firstValue(object, [
+      'description', 'event_description', 'eventDescription', 'short_description', 'shortDescription', 'about', 'summary',
+    ]),
+    imageUrl: firstValue(object, [
+      'image', 'image_url', 'imageUrl', 'cover_url', 'coverUrl', 'coverImage', 'cover_image', 'photo', 'photo_url', 'logo', 'thumbnail',
+    ]),
+    url: firstValue(object, [
+      'url', 'event_url', 'eventUrl', 'canonical_url', 'canonicalUrl', 'share_url', 'shareUrl',
+    ]),
     score,
     sourceKind,
   };
@@ -213,9 +284,9 @@ function collectCandidates(root: unknown, sourceKind: EventPreview['sourceKind']
   const candidates: EventCandidate[] = [];
   const seen = new WeakSet<object>();
   function walk(value: unknown, depth: number) {
-    if (!value || depth > 9) return;
+    if (!value || depth > 10) return;
     if (Array.isArray(value)) {
-      value.slice(0, 300).forEach((item) => walk(item, depth + 1));
+      value.slice(0, 350).forEach((item) => walk(item, depth + 1));
       return;
     }
     if (typeof value !== 'object') return;
@@ -224,7 +295,7 @@ function collectCandidates(root: unknown, sourceKind: EventPreview['sourceKind']
     const object = value as Record<string, unknown>;
     const candidate = objectCandidate(object, sourceKind);
     if (candidate) candidates.push(candidate);
-    Object.values(object).slice(0, 350).forEach((item) => walk(item, depth + 1));
+    Object.values(object).slice(0, 400).forEach((item) => walk(item, depth + 1));
   }
   walk(root, 0);
   return candidates;
@@ -249,7 +320,8 @@ function metadata(html: string) {
   const title = cleanText(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || '', 300);
   const canonicalTag = html.match(/<link\b[^>]*rel=["'][^"']*canonical[^"']*["'][^>]*>/i)?.[0] || '';
   const canonical = canonicalTag ? tagAttributes(canonicalTag).get('href') || '' : '';
-  return { values, title, canonical };
+  const timeValues = [...html.matchAll(/<time\b[^>]*datetime=["']([^"']+)["'][^>]*>/gi)].map((match) => match[1]);
+  return { values, title, canonical, timeValues };
 }
 
 function parsedScriptJson(html: string) {
@@ -257,18 +329,19 @@ function parsedScriptJson(html: string) {
   const scriptPattern = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
   let match: RegExpExecArray | null;
   let count = 0;
-  while ((match = scriptPattern.exec(html)) && count < 80) {
+  while ((match = scriptPattern.exec(html)) && count < 100) {
     count += 1;
     const attributes = tagAttributes(`<script ${match[1]}>`);
     const type = (attributes.get('type') || '').toLowerCase();
     const id = (attributes.get('id') || '').toLowerCase();
-    if (!type.includes('json') && id !== '__next_data__') continue;
+    const candidateId = id.includes('data') || id.includes('state') || id.includes('apollo') || id.includes('context');
+    if (!type.includes('json') && id !== '__next_data__' && !candidateId) continue;
     const raw = decodeEntities(match[2].trim()).replace(/^<!--|-->$/g, '').trim();
-    if (!raw || raw.length > 1_500_000) continue;
+    if (!raw || raw.length > 1_500_000 || (!raw.startsWith('{') && !raw.startsWith('['))) continue;
     try {
       results.push({ value: JSON.parse(raw), sourceKind: type.includes('ld+json') ? 'json-ld' : 'embedded-json' });
     } catch {
-      // Invalid or JavaScript-shaped data is ignored; metadata remains available as a fallback.
+      // JavaScript-shaped state is ignored; structured data and metadata remain available.
     }
   }
   return results;
@@ -290,9 +363,29 @@ function buildPreview(html: string, pageUrl: URL): EventPreview {
   const winner = candidates[0];
   const values = meta.values;
   const title = cleanText(winner?.title || values.get('og:title') || values.get('twitter:title') || meta.title, 300);
-  const startAt = dateValue(winner?.startAt || values.get('event:start_time') || values.get('event:start') || values.get('startdate'));
-  const endAt = dateValue(winner?.endAt || values.get('event:end_time') || values.get('event:end') || values.get('enddate'));
-  const location = locationValue(winner?.location || values.get('event:location') || values.get('place:location'));
+  const startAt = dateValue(
+    winner?.startAt
+      || values.get('event:start_time')
+      || values.get('event:start')
+      || values.get('startdate')
+      || values.get('start_date')
+      || meta.timeValues[0],
+  );
+  const endAt = dateValue(
+    winner?.endAt
+      || values.get('event:end_time')
+      || values.get('event:end')
+      || values.get('enddate')
+      || values.get('end_date')
+      || meta.timeValues[1],
+  );
+  const location = locationValue(
+    winner?.location
+      || values.get('event:location')
+      || values.get('place:location')
+      || values.get('location')
+      || values.get('venue'),
+  );
   const description = cleanText(winner?.description || values.get('og:description') || values.get('description') || values.get('twitter:description'), 1600);
   const imageUrl = absoluteUrl(imageValue(winner?.imageUrl) || values.get('og:image') || values.get('twitter:image') || '', pageUrl);
   const canonicalUrl = absoluteUrl(cleanText(winner?.url, 1000) || values.get('og:url') || meta.canonical, pageUrl) || pageUrl.toString();
