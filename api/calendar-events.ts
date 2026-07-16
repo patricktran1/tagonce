@@ -79,7 +79,7 @@ function normalizeAllDayEvents(
       start: startDate,
       end: endExclusive,
       allDay: true,
-      relevance: startDate === localDate ? 'today' : 'upcoming',
+      relevance: 'today',
     }];
   });
 }
@@ -95,9 +95,8 @@ export default {
     if (requestedEventName) upstreamUrl.searchParams.set('eventName', requestedEventName);
     const localDate = requestUrl.searchParams.get('localDate') || '';
     if (validDateOnly(localDate)) upstreamUrl.searchParams.set('localDate', localDate);
-    const days = validRangeDays(requestUrl.searchParams.get('days') || '')
-      ? requestUrl.searchParams.get('days')!
-      : '1';
+    const requestedDays = requestUrl.searchParams.get('days') || '';
+    const days = validRangeDays(requestedDays) ? requestedDays : '1';
     upstreamUrl.searchParams.set('days', days);
 
     const upstream = await fetch(upstreamUrl, {
