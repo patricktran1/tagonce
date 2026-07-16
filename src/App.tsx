@@ -25,7 +25,13 @@ import { ScanPage } from './components/ScanPage';
 import { SettingsPage } from './components/SettingsPage';
 import { Sidebar, type PageKey } from './components/Sidebar';
 import { defaultBrandSettings, demoEntities } from './data/demo';
-import { restoreGoogleCalendarReturn } from './lib/calendarService';
+import {
+  clearRememberedGoogleCalendarAccount,
+  connectGoogleCalendar,
+  disconnectGoogleCalendar,
+  getRememberedGoogleCalendarAccount,
+  restoreGoogleCalendarReturn,
+} from './lib/calendarService';
 import { loadLocal, saveLocal } from './lib/storage';
 import type {
   BrandSettings,
@@ -42,6 +48,7 @@ const CAMPAIGN_KEY = 'tagonce.campaigns.v1';
 const BRAND_KEY = 'tagonce.brand.v1';
 const CONNECTION_KEY = 'tagonce.connections.v1';
 const PROFILE_KEY = 'tagonce.profile.v1';
+const WORKSPACE_KEYS = [ENTITY_KEY, CAMPAIGN_KEY, BRAND_KEY, CONNECTION_KEY, PROFILE_KEY];
 
 const defaultConnections: SocialConnection[] = [
   { platform: 'linkedin', connected: false, accountType: 'Personal profile or company page' },
@@ -83,7 +90,7 @@ const defaultProfile: MyProfile = {
 
 const pageMeta: Record<PageKey, { title: string; eyebrow: string }> = {
   dashboard: { title: 'Dashboard', eyebrow: 'Identity workspace overview' },
-  event: { title: 'Event launcher', eyebrow: 'Luma links, manual entry and calendar beta' },
+  event: { title: 'Event launcher', eyebrow: 'Links, calendar invites and Google Calendar' },
   mycard: { title: 'My QR cards', eyebrow: 'Contextual identity exchange' },
   scan: { title: 'Receive card', eyebrow: 'Save the person and the moment' },
   address: { title: 'Address book', eyebrow: 'Social contacts and memories' },
@@ -119,6 +126,7 @@ export default function App() {
   const [brand, setBrand] = useState<BrandSettings>(() => loadLocal(BRAND_KEY, defaultBrandSettings));
   const [connections, setConnections] = useState<SocialConnection[]>(() => loadLocal(CONNECTION_KEY, defaultConnections));
   const [profile, setProfile] = useState<MyProfile>(() => loadLocal(PROFILE_KEY, defaultProfile));
+  const [googleAccount, setGoogleAccount] = useState(() => getRememberedGoogleCalendarAccount());
 
   useEffect(() => saveLocal(ENTITY_KEY, entities), [entities]);
   useEffect(() => saveLocal(CAMPAIGN_KEY, campaigns), [campaigns]);
@@ -167,6 +175,54 @@ export default function App() {
     });
   }
 
+  function connectFromHeader(selectAccount = false) {
+    connectGoogleCalendar(activePage === 'event' ? 'event' : undefined, '', selectAccount);
+  }
+
+  async function switchGoogleAccount() {
+    try {
+      await disconnectGoogleCalendar();
+    } catch {
+      // The explicit account chooser can still replace an expired local session.
+    }
+    clearRememberedGoogleCalendarAccount();
+    setGoogleAccount('');
+    connectFromHeader(true);
+  }
+
+  async function logout() {
+    try {
+      await disconnectGoogleCalendar();
+    } catch {
+      // Local logout should still complete when the Calendar session already expired.
+    }
+    clearRememberedGoogleCalendarAccount();
+    setGoogleAccount('');
+    setActivePage('dashboard');
+  }
+
+  async function eraseWorkspace() {
+    const confirmed = window.confirm(
+      'Erase this browser’s TagOnce workspace? This deletes saved contacts, cards, campaigns, profile details and social settings. This cannot be undone.',
+    );
+    if (!confirmed) return;
+
+    try {
+      await disconnectGoogleCalendar();
+    } catch {
+      // Local data erasure does not depend on an active Calendar session.
+    }
+    WORKSPACE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+    clearRememberedGoogleCalendarAccount();
+    setEntities([]);
+    setCampaigns([]);
+    setBrand(defaultBrandSettings);
+    setConnections(defaultConnections);
+    setProfile(defaultProfile);
+    setGoogleAccount('');
+    setActivePage('dashboard');
+  }
+
   const page = useMemo(() => {
     switch (activePage) {
       case 'dashboard':
@@ -209,7 +265,19 @@ export default function App() {
     <div className="app-shell">
       <Sidebar activePage={activePage} onNavigate={setActivePage} />
       <main className="main-shell">
-        <Header title={currentMeta.title} eyebrow={currentMeta.eyebrow} />
+        <Header
+          title={currentMeta.title}
+          eyebrow={currentMeta.eyebrow}
+          profileName={profile.displayName}
+          profileEmail={profile.email}
+          googleAccount={googleAccount}
+          onOpenProfile={() => setActivePage('mycard')}
+          onOpenCalendar={() => setActivePage('event')}
+          onConnectGoogle={() => connectFromHeader(false)}
+          onSwitchGoogle={switchGoogleAccount}
+          onLogout={logout}
+          onEraseWorkspace={eraseWorkspace}
+        />
         <div className="page-container">{page}</div>
       </main>
     </div>
