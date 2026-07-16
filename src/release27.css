@@ -1,0 +1,138 @@
+/* Release 0.27: upcoming calendar horizons */
+.calendar-connected-heading {
+  align-items: center;
+  gap: 14px;
+}
+
+.calendar-connected-heading > span {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.calendar-connected-heading > span small {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f2edff;
+  color: #694ac4;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.calendar-connected-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.calendar-open-link {
+  text-decoration: none;
+}
+
+.calendar-range-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 4px 0 18px;
+  padding: 10px 12px;
+  border: 1px solid #e6deef;
+  border-radius: 14px;
+  background: #fbf9fd;
+}
+
+.calendar-range-toolbar > span {
+  color: #6c6072;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.calendar-range-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid #ded5e8;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.calendar-range-switch button {
+  min-height: 34px;
+  padding: 7px 13px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #62566a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.calendar-range-switch button:hover:not(:disabled) {
+  background: #f5f1fb;
+}
+
+.calendar-range-switch button.active {
+  background: #6845cc;
+  color: #fff;
+  box-shadow: 0 5px 13px rgba(78, 47, 167, .2);
+}
+
+.calendar-range-switch button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.calendar-range-loading {
+  margin-bottom: 16px;
+  border-radius: 14px;
+  background: #faf8fd;
+}
+
+@media (max-width: 760px) {
+  .calendar-connected-heading {
+    align-items: flex-start;
+  }
+
+  .calendar-connected-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .calendar-connected-actions .button {
+    flex: 1 1 160px;
+    justify-content: center;
+  }
+
+  .calendar-range-toolbar {
+    display: grid;
+    gap: 8px;
+    overflow: hidden;
+  }
+
+  .calendar-range-switch {
+    width: 100%;
+    overflow-x: auto;
+    justify-content: flex-start;
+    scrollbar-width: none;
+  }
+
+  .calendar-range-switch::-webkit-scrollbar {
+    display: none;
+  }
+
+  .calendar-range-switch button {
+    flex: 1 0 auto;
+    min-height: 44px;
+    padding-inline: 16px;
+  }
+}
