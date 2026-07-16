@@ -1,6 +1,7 @@
 import {
   CalendarCheck,
   CalendarDays,
+  ChevronDown,
   ExternalLink,
   Loader2,
   MapPin,
@@ -19,6 +20,7 @@ import {
   type CalendarEventSuggestion,
 } from '../lib/calendarService';
 import type { MyProfile } from '../types';
+import { EventImportPanel } from './EventImportPanel';
 
 interface EventCardLauncherProps {
   profile: MyProfile;
@@ -88,6 +90,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
   const [rememberedGoogleEmail, setRememberedGoogleEmail] = useState(initialRememberedAccount);
   const [googleEmail, setGoogleEmail] = useState(initialRememberedAccount);
   const [showEmailFallback, setShowEmailFallback] = useState(false);
+  const [showCalendarBeta, setShowCalendarBeta] = useState(Boolean(initialRememberedAccount));
 
   async function loadEvents() {
     setLoading(true);
@@ -106,6 +109,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
         return;
       }
       setState('connected');
+      setShowCalendarBeta(true);
       setEvents(response.events || []);
     } catch (loadError) {
       setState('connected');
@@ -124,7 +128,6 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
         setRememberedGoogleEmail(verifiedAccount);
         setGoogleEmail(verifiedAccount);
       }
-
       const callbackMessage = oauthResultMessages[oauthResult] || (
         oauthResult && oauthResult !== 'connected'
           ? `Google returned an unexpected result: ${oauthResult}.`
@@ -136,23 +139,23 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
         if (cancelled) return;
         if (!status.configured) {
           setState('unconfigured');
-          setError(callbackMessage || oauthResultMessages.unconfigured);
+          setError(callbackMessage || '');
           return;
         }
         if (!status.connected) {
           setState('disconnected');
-          if (oauthResult === 'connected') {
-            setError('Google approved access, but TagOnce could not read the secure session. Reload once and reconnect.');
-          } else if (callbackMessage) {
+          if (callbackMessage) {
+            setShowCalendarBeta(true);
             setError(callbackMessage);
           }
           return;
         }
+        setShowCalendarBeta(true);
         await loadEvents();
       } catch (statusError) {
         if (!cancelled) {
           setState('disconnected');
-          setError(statusError instanceof Error ? statusError.message : 'Calendar connection could not be checked.');
+          if (callbackMessage) setError(callbackMessage);
         }
       }
     }
@@ -163,7 +166,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
   function connectWithGoogle() {
     if (!validEmail(rememberedGoogleEmail)) {
       setShowEmailFallback(true);
-      setError('Confirm your Google account once. After Google verifies it, TagOnce will remember that account for one-click reconnects.');
+      setError('Enter the Google account you want to use, or keep using the link/manual launcher above.');
       return;
     }
     setState('connecting');
@@ -196,7 +199,11 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     onChange({
       ...profile,
       eventName: event.title,
+      eventStartAt: event.start,
+      eventEndAt: event.end,
       eventEndsAt: localDateValue(event.end),
+      eventLocation: event.location,
+      eventUrl: event.htmlLink || '',
       cardSelections: {
         ...profile.cardSelections,
         event: nextEventSelection,
@@ -207,142 +214,113 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
 
   return (
     <div className="page-stack live-event-page">
-      <section className="live-event-hero">
+      <section className="live-event-hero event-launcher-hero">
         <div>
-          <span className="hero-kicker">Calendar sync · beta</span>
-          <h2>Walk into an event with the right card already loaded.</h2>
+          <span className="hero-kicker">Event card launcher</span>
+          <h2>Turn any event into the right QR card.</h2>
           <p>
-            TagOnce finds the event happening around you, then turns it into an Event QR preset with
-            the correct name and expiration. Luma registrations work when they appear in Google Calendar.
+            Paste a Luma or public event link, review the extracted time and venue, then open an Event QR
+            without connecting another account. Manual entry always works.
           </p>
         </div>
-        <span className="live-event-orbit"><CalendarDays size={32} /></span>
+        <span className="live-event-orbit"><Sparkles size={32} /></span>
       </section>
 
-      <section className="panel live-event-panel">
-        <div className="panel-heading live-event-panel-heading">
-          <div>
-            <span className="step-badge">BETA</span>
-            <div><h3>Nearby calendar events</h3><p>Current, recently ended and soon-starting events are ranked first.</p></div>
-          </div>
-          {state === 'connected' && (
-            <button className="button secondary small-button" disabled={loading} onClick={loadEvents}>
-              <RefreshCw className={loading ? 'spin' : ''} size={15} /> Refresh
-            </button>
-          )}
-        </div>
+      <EventImportPanel profile={profile} onChange={onChange} onOpenCards={onOpenCards} />
 
-        {(state === 'checking' || state === 'connecting' || loading) && (
-          <div className="live-event-loading"><Loader2 className="spin" size={19} />
-            {state === 'connecting' ? 'Taking you to Google…' : 'Checking your calendar…'}
-          </div>
-        )}
+      <section className={`panel calendar-beta-panel${showCalendarBeta ? ' open' : ''}`}>
+        <button
+          className="calendar-beta-toggle"
+          type="button"
+          onClick={() => setShowCalendarBeta((current) => !current)}
+          aria-expanded={showCalendarBeta}
+        >
+          <span className="calendar-detection-icon"><CalendarDays size={20} /></span>
+          <span><strong>Google Calendar sync</strong><small>Optional beta convenience for nearby events</small></span>
+          <span className="beta-pill">BETA</span>
+          <ChevronDown size={18} />
+        </button>
 
-        {state === 'unconfigured' && !loading && (
-          <div className="live-event-connect muted-calendar-state">
-            <span className="calendar-detection-icon"><CalendarDays size={22} /></span>
-            <div>
-              <h3>Google connection is temporarily unavailable</h3>
-              <p>The TagOnce deployment needs its Google OAuth client secret and session configuration.</p>
-            </div>
-          </div>
-        )}
-
-        {state === 'disconnected' && !loading && (
-          <div className="live-event-connect">
-            <span className="calendar-detection-icon"><CalendarCheck size={22} /></span>
-            <div>
-              <h3>Connect with Google</h3>
-              <p>Approve read-only access to event titles, times and locations.</p>
-              <div className="google-calendar-primary-connect">
-                <button className="google-oauth-button" type="button" onClick={connectWithGoogle}>
-                  <GoogleMark />
-                  <span>Continue with Google</span>
-                </button>
-                {validEmail(rememberedGoogleEmail) ? (
-                  <span>Continue as {rememberedGoogleEmail}</span>
-                ) : (
-                  <span>First connection: choose the Google account below.</span>
-                )}
-                <small>TagOnce can read your Calendar. It cannot edit it.</small>
+        {showCalendarBeta && (
+          <div className="calendar-beta-body">
+            {(state === 'checking' || state === 'connecting' || loading) && (
+              <div className="live-event-loading"><Loader2 className="spin" size={19} />
+                {state === 'connecting' ? 'Taking you to Google…' : 'Checking your calendar…'}
               </div>
+            )}
 
-              <button
-                className="text-button calendar-fallback-toggle"
-                type="button"
-                onClick={() => {
-                  setShowEmailFallback((current) => !current);
-                  setError('');
-                }}
-              >
-                {showEmailFallback ? 'Hide account options' : validEmail(rememberedGoogleEmail) ? 'Use another Google account' : 'Choose Google account'}
-              </button>
+            {state === 'unconfigured' && !loading && (
+              <div className="live-event-connect muted-calendar-state">
+                <span className="calendar-detection-icon"><CalendarDays size={22} /></span>
+                <div><h3>Calendar beta is unavailable</h3><p>The link and manual event launcher above still works normally.</p></div>
+              </div>
+            )}
 
-              {showEmailFallback && (
-                <div className="calendar-account-connect calendar-email-fallback">
-                  <label htmlFor="calendar-google-email">Google account email</label>
-                  <div className="calendar-account-row">
-                    <input
-                      id="calendar-google-email"
-                      type="email"
-                      autoComplete="email"
-                      placeholder="you@gmail.com"
-                      value={googleEmail}
-                      onChange={(event) => setGoogleEmail(event.target.value)}
-                    />
-                    <button
-                      className="button primary"
-                      disabled={!validEmail(googleEmail)}
-                      onClick={connectWithEmail}
-                    >
-                      <CalendarCheck size={17} /> Continue
+            {state === 'disconnected' && !loading && (
+              <div className="live-event-connect compact-google-connect">
+                <span className="calendar-detection-icon"><CalendarCheck size={22} /></span>
+                <div>
+                  <h3>Connect Google Calendar</h3>
+                  <p>Optional read-only access to event titles, times and locations.</p>
+                  <div className="google-calendar-primary-connect">
+                    <button className="google-oauth-button" type="button" onClick={connectWithGoogle}>
+                      <GoogleMark /><span>Continue with Google</span>
                     </button>
+                    {validEmail(rememberedGoogleEmail) && <span>Continue as {rememberedGoogleEmail}</span>}
                   </div>
-                  <span className="calendar-account-help">Google verifies this account during authorization. TagOnce remembers only the verified account for future reconnects.</span>
+                  <button className="text-button calendar-fallback-toggle" type="button" onClick={() => { setShowEmailFallback((current) => !current); setError(''); }}>
+                    {showEmailFallback ? 'Hide account field' : 'Use a different account'}
+                  </button>
+                  {showEmailFallback && (
+                    <div className="calendar-account-connect calendar-email-fallback">
+                      <label htmlFor="calendar-google-email">Google account email</label>
+                      <div className="calendar-account-row">
+                        <input id="calendar-google-email" type="email" autoComplete="email" placeholder="you@gmail.com" value={googleEmail} onChange={(event) => setGoogleEmail(event.target.value)} />
+                        <button className="button primary" disabled={!validEmail(googleEmail)} onClick={connectWithEmail}><CalendarCheck size={17} /> Continue</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
+            {state === 'connected' && !loading && (
+              <div className="calendar-connected-area">
+                <div className="calendar-connected-heading">
+                  <span><CalendarCheck size={17} /><strong>Calendar connected</strong></span>
+                  <button className="button secondary small-button" disabled={loading} onClick={loadEvents}><RefreshCw className={loading ? 'spin' : ''} size={15} /> Refresh</button>
+                </div>
+                {events.length === 0 && <div className="live-event-empty"><CalendarDays size={24} /><strong>No nearby event found</strong><span>Use the link or manual launcher above, or create a timed Calendar event and refresh.</span></div>}
+                {events.length > 0 && (
+                  <div className="live-event-list">
+                    {events.map((event) => (
+                      <article className={event.matchesCard ? 'live-event-card matches-card' : 'live-event-card'} key={event.id}>
+                        <div className="live-event-card-topline">
+                          <span className="calendar-relevance-pill">{event.matchesCard ? 'Matches current card' : relevanceLabels[event.relevance]}</span>
+                          {event.htmlLink && <a href={event.htmlLink} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open</a>}
+                        </div>
+                        <h3>{event.title}</h3>
+                        <div className="live-event-meta">
+                          <span><CalendarDays size={15} /> {eventTimeLabel(event)}</span>
+                          <span><MapPin size={15} /> {event.location || 'No venue listed'}</span>
+                        </div>
+                        <button className="button primary full-button" onClick={() => launchEventCard(event)}><Sparkles size={17} /> Make this my Event QR</button>
+                      </article>
+                    ))}
+                  </div>
+                )}
+                <button className="text-button live-event-disconnect" onClick={disconnect}><Unplug size={13} /> Disconnect Google</button>
+              </div>
+            )}
+
+            {error && <div className="inline-error">{error}</div>}
           </div>
         )}
-
-        {state === 'connected' && !loading && events.length === 0 && (
-          <div className="live-event-empty">
-            <CalendarDays size={24} />
-            <strong>Google Calendar connected</strong>
-            <span>No nearby event was found. Create a timed event happening now or within the next three hours, then refresh.</span>
-          </div>
-        )}
-
-        {state === 'connected' && !loading && events.length > 0 && (
-          <div className="live-event-list">
-            {events.map((event) => (
-              <article className={event.matchesCard ? 'live-event-card matches-card' : 'live-event-card'} key={event.id}>
-                <div className="live-event-card-topline">
-                  <span className="calendar-relevance-pill">{event.matchesCard ? 'Matches current card' : relevanceLabels[event.relevance]}</span>
-                  {event.htmlLink && <a href={event.htmlLink} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open</a>}
-                </div>
-                <h3>{event.title}</h3>
-                <div className="live-event-meta">
-                  <span><CalendarDays size={15} /> {eventTimeLabel(event)}</span>
-                  <span><MapPin size={15} /> {event.location || 'No venue listed'}</span>
-                </div>
-                <button className="button primary full-button" onClick={() => launchEventCard(event)}>
-                  <Sparkles size={17} /> Make this my Event QR
-                </button>
-              </article>
-            ))}
-          </div>
-        )}
-
-        {state === 'connected' && (
-          <button className="text-button live-event-disconnect" onClick={disconnect}><Unplug size={13} /> Disconnect Google</button>
-        )}
-        {error && <div className="inline-error">{error}</div>}
       </section>
 
       <section className="live-event-explainer">
-        <strong>What happens after you choose an event?</strong>
-        <span>TagOnce opens My QR Cards in Event mode, selects event context, and expires the card after the event date.</span>
+        <strong>What happens after you create the event?</strong>
+        <span>TagOnce opens My QR Cards in Event mode, adds the event context, and expires the temporary card after the event date.</span>
       </section>
     </div>
   );
