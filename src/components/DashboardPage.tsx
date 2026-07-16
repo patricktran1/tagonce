@@ -1,149 +1,135 @@
-import { ArrowRight, AtSign, CalendarClock, FileStack, Send, Sparkles } from 'lucide-react';
-import type { Campaign, MentionEntity } from '../types';
-import { PlatformMark } from './PlatformMark';
+import {
+  ArrowRight,
+  Beaker,
+  CalendarCheck,
+  CalendarPlus,
+  ContactRound,
+  IdCard,
+  LogIn,
+  QrCode,
+  ScanLine,
+  Sparkles,
+  UsersRound,
+} from 'lucide-react';
+import type { Campaign, GoogleAccountIdentity, MentionEntity, MyProfile } from '../types';
+import { ProfileAvatar } from './ProfileAvatar';
 
 interface DashboardPageProps {
+  profile: MyProfile;
+  googleIdentity: GoogleAccountIdentity | null;
   campaigns: Campaign[];
   entities: MentionEntity[];
-  onCreate: () => void;
-  onOpenCampaigns: () => void;
+  onConnectGoogle: () => void;
+  onOpenEvents: () => void;
+  onOpenCards: () => void;
+  onExchange: () => void;
+  onOpenContacts: () => void;
+  onOpenBeta: () => void;
 }
 
 export function DashboardPage({
+  profile,
+  googleIdentity,
   campaigns,
   entities,
-  onCreate,
-  onOpenCampaigns,
+  onConnectGoogle,
+  onOpenEvents,
+  onOpenCards,
+  onExchange,
+  onOpenContacts,
+  onOpenBeta,
 }: DashboardPageProps) {
-  const platformPosts = campaigns.reduce(
-    (total, campaign) => total + campaign.variants.length,
-    0,
-  );
-  const scheduled = campaigns
-    .filter((campaign) => campaign.status === 'scheduled' && campaign.scheduledFor)
-    .sort(
-      (a, b) =>
-        new Date(a.scheduledFor ?? 0).getTime() - new Date(b.scheduledFor ?? 0).getTime(),
-    );
-  const recent = campaigns.slice(0, 4);
+  const connected = Boolean(googleIdentity?.email);
+  const displayName = profile.displayName || googleIdentity?.displayName || '';
+  const avatar = profile.avatarUrl || googleIdentity?.picture;
 
   return (
-    <div className="page-stack">
-      <section className="hero-panel dashboard-hero">
-        <div>
-          <span className="hero-kicker">TagOnce command center</span>
-          <h2>Turn one idea into a complete social campaign.</h2>
+    <div className="page-stack qr-home-page">
+      <section className={`hero-panel qr-home-hero${connected ? ' connected' : ''}`}>
+        <div className="qr-home-hero-copy">
+          <span className="hero-kicker">Event contact exchange</span>
+          <h2>{connected ? `Ready when you are, ${displayName.split(/\s+/)[0] || 'there'}.` : 'Meet someone. Exchange the whole moment.'}</h2>
           <p>
-            Your mentions, platform variants, schedules and publishing status live in one
-            operating layer.
+            Create a QR for an event, share the contact details you choose, and remember who you met, where, and why it mattered.
           </p>
-          <button className="button primary hero-button" onClick={onCreate}>
-            <Sparkles size={17} />
-            Create campaign
-          </button>
+          <div className="qr-home-hero-actions">
+            {connected ? (
+              <>
+                <button className="button primary large-button" onClick={onOpenEvents}><CalendarPlus size={18} /> Create Event QR</button>
+                <button className="button secondary large-button" onClick={onOpenCards}><QrCode size={18} /> Show my QR</button>
+              </>
+            ) : (
+              <button className="button primary google-home-button" onClick={onConnectGoogle}>
+                <LogIn size={18} /> Continue with Google
+              </button>
+            )}
+          </div>
+          {!connected && <small className="google-home-note">One Google step creates your profile from your verified name, photo and email, and connects read-only Calendar.</small>}
         </div>
-        <div className="dashboard-signal">
-          <span>Next scheduled campaign</span>
-          <strong>
-            {scheduled[0]?.scheduledFor
-              ? new Date(scheduled[0].scheduledFor).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                })
-              : 'None'}
-          </strong>
-          <small>{scheduled[0]?.title ?? 'Build and schedule your first campaign'}</small>
+
+        <div className="qr-home-profile-card">
+          <ProfileAvatar name={displayName || 'TagOnce user'} src={avatar} className="qr-home-avatar" />
+          <span>
+            <small>{connected ? 'GOOGLE PROFILE READY' : 'YOUR PROFILE'}</small>
+            <strong>{displayName || 'Created after Google sign-in'}</strong>
+            <p>{profile.email || googleIdentity?.email || 'Name, photo and email auto-fill'}</p>
+          </span>
+          <span className={`qr-home-status${connected ? ' connected' : ''}`}>
+            {connected ? <CalendarCheck size={14} /> : <Sparkles size={14} />}
+            {connected ? 'Calendar connected' : 'One-step setup'}
+          </span>
         </div>
       </section>
 
-      <section className="metric-grid">
-        <article className="metric-card">
-          <span className="metric-icon"><FileStack size={18} /></span>
-          <span><small>Campaigns</small><strong>{campaigns.length}</strong></span>
-        </article>
-        <article className="metric-card">
-          <span className="metric-icon"><Send size={18} /></span>
-          <span><small>Platform posts</small><strong>{platformPosts}</strong></span>
-        </article>
-        <article className="metric-card">
-          <span className="metric-icon"><AtSign size={18} /></span>
-          <span><small>Saved mentions</small><strong>{entities.length}</strong></span>
-        </article>
-        <article className="metric-card">
-          <span className="metric-icon"><CalendarClock size={18} /></span>
-          <span><small>Scheduled</small><strong>{scheduled.length}</strong></span>
-        </article>
+      <section className="qr-home-action-grid" aria-label="Main TagOnce actions">
+        <button className="qr-home-action-card primary-action" onClick={onOpenEvents}>
+          <span><CalendarPlus size={22} /></span>
+          <strong>Create an Event QR</strong>
+          <p>Choose a Google Calendar event, paste a Luma link, upload an invite, or type one manually.</p>
+          <small>Start here <ArrowRight size={13} /></small>
+        </button>
+        <button className="qr-home-action-card" onClick={onOpenCards}>
+          <span><IdCard size={22} /></span>
+          <strong>My QR cards</strong>
+          <p>Show, download or share your Personal, Event and Custom contact cards.</p>
+          <small>Open cards <ArrowRight size={13} /></small>
+        </button>
+        <button className="qr-home-action-card" onClick={onExchange}>
+          <span><ScanLine size={22} /></span>
+          <strong>Exchange cards</strong>
+          <p>Open a scanned card, save the encounter, then share your own card back.</p>
+          <small>Exchange now <ArrowRight size={13} /></small>
+        </button>
+        <button className="qr-home-action-card" onClick={onOpenContacts}>
+          <span><ContactRound size={22} /></span>
+          <strong>Contacts and memories</strong>
+          <p>{entities.length ? `${entities.length} saved ${entities.length === 1 ? 'contact' : 'contacts'} with meeting context.` : 'Your saved contacts and where you met will live here.'}</p>
+          <small>Open contacts <ArrowRight size={13} /></small>
+        </button>
       </section>
 
-      <div className="dashboard-grid">
-        <section className="panel dashboard-panel">
-          <div className="panel-heading simple-heading">
-            <div>
-              <div>
-                <h3>Recent campaigns</h3>
-                <p>Your latest master posts and generated channel sets.</p>
-              </div>
-            </div>
-            <button className="text-button" onClick={onOpenCampaigns}>
-              View all <ArrowRight size={14} />
-            </button>
-          </div>
-          {recent.length === 0 ? (
-            <div className="empty-state slim-empty">
-              <Sparkles size={24} />
-              <strong>No campaigns yet</strong>
-              <span>Your first campaign will appear here.</span>
-            </div>
-          ) : (
-            <div className="dashboard-campaign-list">
-              {recent.map((campaign) => (
-                <article key={campaign.id}>
-                  <span className={`status-dot status-${campaign.status}`} />
-                  <span className="dashboard-campaign-copy">
-                    <strong>{campaign.title}</strong>
-                    <small>{new Date(campaign.createdAt).toLocaleDateString()}</small>
-                  </span>
-                  <span className="platform-stack compact-stack">
-                    {campaign.selectedPlatforms.slice(0, 5).map((platform) => (
-                      <PlatformMark key={platform} platform={platform} size="sm" />
-                    ))}
-                  </span>
-                  <span className={`status-pill status-${campaign.status}`}>
-                    {campaign.status}
-                  </span>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+      <section className={`panel calendar-front-door${connected ? ' connected' : ''}`}>
+        <div className="calendar-front-door-icon">{connected ? <CalendarCheck size={24} /> : <CalendarPlus size={24} />}</div>
+        <div>
+          <span className="eyebrow">Google Calendar</span>
+          <h3>{connected ? 'Calendar is connected and ready' : 'Connect Calendar to find the event automatically'}</h3>
+          <p>{connected ? 'TagOnce can suggest what is happening now or starting soon, using read-only access.' : 'The same Google setup creates your personal profile and gives TagOnce read-only event access.'}</p>
+        </div>
+        <button className={`button ${connected ? 'secondary' : 'primary'}`} onClick={connected ? onOpenEvents : onConnectGoogle}>
+          {connected ? 'View events' : 'Continue with Google'} <ArrowRight size={15} />
+        </button>
+      </section>
 
-        <section className="panel dashboard-panel">
-          <div className="panel-heading simple-heading">
-            <div>
-              <div>
-                <h3>Mention coverage</h3>
-                <p>How complete your reusable identity graph is.</p>
-              </div>
-            </div>
-          </div>
-          <div className="coverage-list">
-            {entities.slice(0, 5).map((entity) => {
-              const mapped = Object.keys(entity.mappings).length;
-              const percentage = Math.round((mapped / 7) * 100);
-              return (
-                <div key={entity.id}>
-                  <span className="entity-avatar small-avatar">{entity.initials}</span>
-                  <span className="coverage-copy">
-                    <strong>{entity.displayName}</strong>
-                    <span className="coverage-track"><i style={{ width: `${percentage}%` }} /></span>
-                  </span>
-                  <small>{mapped}/7</small>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      </div>
+      <section className="panel beta-studio-card">
+        <div className="beta-studio-icon"><Beaker size={22} /></div>
+        <div>
+          <span className="eyebrow">Separate beta mode</span>
+          <h3>Post Studio</h3>
+          <p>The original “write once, adapt and tag across platforms” concept still exists, but it no longer competes with the QR exchange product.</p>
+          <span className="beta-studio-stats"><UsersRound size={14} /> {entities.length} saved identities · {campaigns.length} beta campaigns</span>
+        </div>
+        <button className="button secondary" onClick={onOpenBeta}>Open Beta Studio <ArrowRight size={15} /></button>
+      </section>
     </div>
   );
 }
