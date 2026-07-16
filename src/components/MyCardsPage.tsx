@@ -3,7 +3,6 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
-  Clock3,
   Copy,
   Download,
   ExternalLink,
