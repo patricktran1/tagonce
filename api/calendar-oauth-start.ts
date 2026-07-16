@@ -1,11 +1,9 @@
-const BASE_GOOGLE_SCOPES = [
+const GOOGLE_SCOPES = [
   'openid',
   'email',
   'profile',
   'https://www.googleapis.com/auth/calendar.events.readonly',
-];
-
-const DRIVE_APPDATA_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+].join(' ');
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -81,28 +79,22 @@ export default {
     }
 
     const requestUrl = new URL(request.url);
-    const origin = requestUrl.origin;
-    const redirectUri = `${origin}/api/google-calendar/callback`;
+    const redirectUri = `${requestUrl.origin}/api/google-calendar/callback`;
     const loginHint = validLoginHint(requestUrl.searchParams.get('login_hint'));
     const selectAccount = requestUrl.searchParams.get('select_account') === '1';
-    const enableSync = requestUrl.searchParams.get('enable_sync') === '1';
     const state = await signedState(secret);
     const authorizationUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    const scopes = enableSync
-      ? [...BASE_GOOGLE_SCOPES, DRIVE_APPDATA_SCOPE]
-      : BASE_GOOGLE_SCOPES;
     const authorizationParams: Record<string, string> = {
       client_id: id,
       redirect_uri: redirectUri,
       response_type: 'code',
-      scope: scopes.join(' '),
+      scope: GOOGLE_SCOPES,
       access_type: 'offline',
       include_granted_scopes: 'true',
       state,
     };
     if (loginHint) authorizationParams.login_hint = loginHint;
     if (selectAccount) authorizationParams.prompt = 'select_account';
-    if (enableSync) authorizationParams.prompt = 'consent';
     authorizationUrl.search = new URLSearchParams(authorizationParams).toString();
 
     return new Response(null, {
