@@ -111,7 +111,7 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
   async function importEvent() {
     const normalized = normalizedEventUrl(eventUrl);
     if (!normalized) {
-      setError('Paste a complete event link first.');
+      setError('Paste a complete public event link first.');
       return;
     }
 
@@ -149,7 +149,7 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
       }
     } catch (importError) {
       setDraft((current) => ({ ...current, url: normalized }));
-      setError(importError instanceof Error ? importError.message : 'The event link could not be previewed. Enter the details manually.');
+      setError(importError instanceof Error ? importError.message : 'The event page could not be previewed. Enter the details manually.');
     } finally {
       setLoading(false);
     }
@@ -233,10 +233,10 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
     <section className="panel event-import-panel">
       <div className="panel-heading event-import-heading">
         <div>
-          <span className="step-badge">1</span>
+          <span className="step-badge">2</span>
           <div>
-            <h3>Load an event</h3>
-            <p>Paste a public event link, upload a calendar invite, or enter the details manually.</p>
+            <h3>Load or enter the event</h3>
+            <p>Paste any public event page, upload a calendar invitation, or type the details manually.</p>
           </div>
         </div>
         {hasDraft && (
@@ -256,15 +256,19 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
               onKeyDown={(event) => {
                 if (event.key === 'Enter') void importEvent();
               }}
-              placeholder="Paste a Luma or event link"
+              placeholder="Paste an Eventbrite, Meetup, Luma, Yelp, or other event link"
               inputMode="url"
+              autoCapitalize="none"
+              autoCorrect="off"
             />
           </div>
           <button className="button primary" type="button" disabled={loading || importingCalendar || !eventUrl.trim()} onClick={() => void importEvent()}>
             {loading ? <Loader2 className="spin" size={17} /> : <Sparkles size={17} />}
-            {loading ? 'Reading event…' : 'Load link'}
+            {loading ? 'Reading event…' : 'Load event'}
           </button>
         </div>
+
+        <small className="event-link-support-note">Works best with public pages that expose structured event data. Any missing field remains editable below.</small>
 
         <div className="event-import-divider"><span>or</span></div>
 
@@ -278,8 +282,8 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
         <button className="event-ics-upload" type="button" disabled={loading || importingCalendar} onClick={() => calendarFileRef.current?.click()}>
           {importingCalendar ? <Loader2 className="spin" size={20} /> : <FileUp size={20} />}
           <span>
-            <strong>{importingCalendar ? 'Reading calendar invite…' : 'Upload .ics calendar invite'}</strong>
-            <small>Apple Calendar, Outlook, Google Calendar exports and emailed invitations. Parsed only on this device.</small>
+            <strong>{importingCalendar ? 'Reading calendar invitation…' : 'Upload .ics calendar invitation'}</strong>
+            <small>Apple Calendar, Outlook, Google Calendar exports, and emailed invitations. Parsed only on this device.</small>
           </span>
         </button>
       </div>
@@ -322,7 +326,7 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
 
         <label className="field event-source-field">
           <span>Event page</span>
-          <div className="input-with-icon"><ExternalLink size={15} /><input value={draft.url} onChange={(event) => updateDraft('url', event.target.value)} placeholder="https://lu.ma/..." /></div>
+          <div className="input-with-icon"><ExternalLink size={15} /><input value={draft.url} onChange={(event) => updateDraft('url', event.target.value)} placeholder="https://event-site.com/event/..." /></div>
         </label>
 
         <label className="field event-description-field">
