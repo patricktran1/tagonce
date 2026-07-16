@@ -149,10 +149,17 @@ async function verifySignedState(value: string | null, secret: string) {
   }
 }
 
-function redirect(request: Request, result: string, cookies: string[] = [], googleAccount = '') {
+function redirect(
+  request: Request,
+  result: string,
+  cookies: string[] = [],
+  identity?: { email: string; displayName?: string; picture?: string },
+) {
   const destination = new URL('/', request.url);
   destination.searchParams.set('calendar', result);
-  if (googleAccount) destination.searchParams.set('google_account', googleAccount);
+  if (identity?.email) destination.searchParams.set('google_account', identity.email);
+  if (identity?.displayName) destination.searchParams.set('google_name', identity.displayName);
+  if (identity?.picture) destination.searchParams.set('google_picture', identity.picture);
   const headers = new Headers({
     Location: destination.toString(),
     'Cache-Control': 'no-store',
@@ -230,19 +237,22 @@ export default {
       if (!email) return redirect(request, 'identity_email');
 
       const sameAccount = existing?.email?.toLowerCase() === email.toLowerCase();
+      const identity = {
+        email,
+        displayName: typeof payload.name === 'string' ? payload.name : existing?.displayName,
+        picture: typeof payload.picture === 'string' ? payload.picture : existing?.picture,
+      };
       const session: CalendarSession = {
         accessToken: token.access_token,
         refreshToken: token.refresh_token || (sameAccount ? existing?.refreshToken : undefined),
         expiresAt: Date.now() + Math.max(60, token.expires_in || 3600) * 1000,
         scope: token.scope,
-        email,
-        displayName: typeof payload.name === 'string' ? payload.name : existing?.displayName,
-        picture: typeof payload.picture === 'string' ? payload.picture : existing?.picture,
+        ...identity,
       };
       const sessionValue = await encryptSession(session, appConfig.sessionSecret);
       return redirect(request, 'connected', [
         cookie(SESSION_COOKIE, sessionValue, 60 * 60 * 24 * 180),
-      ], email);
+      ], identity);
     } catch (identityError) {
       console.error('Google identity verification failed', identityError);
       return redirect(request, 'identity_token');
