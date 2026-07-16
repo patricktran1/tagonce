@@ -1,0 +1,131 @@
+/* Release 0.16: calendar invite import and production Google Calendar cleanup */
+.event-import-methods {
+  display: grid;
+  gap: 14px;
+}
+
+.event-import-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #918797;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.event-import-divider::before,
+.event-import-divider::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: #e9e2ec;
+}
+
+.event-ics-upload {
+  width: 100%;
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 16px 18px;
+  border: 1px dashed #cfc1db;
+  border-radius: 15px;
+  background: linear-gradient(135deg,#fcfaff,#f7f2fb);
+  color: #43364c;
+  text-align: left;
+  cursor: pointer;
+}
+
+.event-ics-upload:hover:not(:disabled) {
+  border-color: #8767d8;
+  background: #f7f2ff;
+}
+
+.event-ics-upload:disabled {
+  opacity: .65;
+  cursor: wait;
+}
+
+.event-ics-upload > svg {
+  flex: 0 0 auto;
+  color: #7453cf;
+}
+
+.event-ics-upload > span {
+  display: grid;
+  gap: 3px;
+}
+
+.event-ics-upload small {
+  color: #857a8b;
+  line-height: 1.4;
+}
+
+.calendar-integration-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.calendar-integration-panel.open .calendar-integration-toggle > svg:last-child {
+  transform: rotate(180deg);
+}
+
+.calendar-integration-toggle > svg:last-child {
+  transition: transform 160ms ease;
+}
+
+.calendar-integration-pill {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #f0ebf3;
+  color: #786d7e;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .08em;
+}
+
+.calendar-integration-pill.state-connected {
+  background: #e8f7ec;
+  color: #2e7441;
+}
+
+.calendar-clean-connect .google-oauth-button {
+  margin-top: 14px;
+}
+
+.calendar-safari-help {
+  max-width: 560px;
+  margin-top: 13px;
+  color: #766b7c;
+  font-size: 12px;
+}
+
+.calendar-safari-help summary {
+  width: fit-content;
+  color: #66566f;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.calendar-safari-help p {
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .event-ics-upload {
+    align-items: flex-start;
+    min-height: 88px;
+    padding: 15px;
+  }
+
+  .calendar-integration-toggle {
+    grid-template-columns: auto minmax(0,1fr) auto;
+  }
+
+  .calendar-integration-toggle .calendar-integration-pill {
+    display: none;
+  }
+}
