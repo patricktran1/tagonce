@@ -1,7 +1,6 @@
 import type { GoogleAccountIdentity } from '../types';
 
 export type CalendarConnectionState = 'checking' | 'connecting' | 'connected' | 'disconnected' | 'unconfigured';
-export type CalendarRangeDays = 1 | 7 | 30;
 
 export interface CalendarStatusResponse {
   configured: boolean;
@@ -18,7 +17,7 @@ export interface CalendarEventSuggestion {
   end: string;
   htmlLink?: string;
   allDay?: boolean;
-  relevance: 'happening_now' | 'starting_soon' | 'recently_ended' | 'today' | 'upcoming';
+  relevance: 'happening_now' | 'starting_soon' | 'recently_ended' | 'today';
   matchesCard: boolean;
 }
 
@@ -166,13 +165,11 @@ export async function getCalendarStatus() {
   return payload;
 }
 
-export async function getCalendarEventSuggestions(
-  eventName = '',
-  rangeDays: CalendarRangeDays = 1,
-) {
+export async function getCalendarEventSuggestions(eventName = '', rangeDays = 1) {
+  const safeRange = rangeDays === 7 || rangeDays === 30 ? rangeDays : 1;
   const params = new URLSearchParams({
     localDate: localDateKey(),
-    days: String(rangeDays),
+    days: String(safeRange),
   });
   if (eventName.trim()) params.set('eventName', eventName.trim());
   const { response, payload } = await readJson<CalendarEventResponse>(
