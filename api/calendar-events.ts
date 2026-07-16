@@ -83,6 +83,8 @@ export default {
     upstreamUrl.searchParams.set('action', 'events');
     const requestedEventName = requestUrl.searchParams.get('eventName');
     if (requestedEventName) upstreamUrl.searchParams.set('eventName', requestedEventName);
+    const localDate = requestUrl.searchParams.get('localDate') || '';
+    if (validDateOnly(localDate)) upstreamUrl.searchParams.set('localDate', localDate);
 
     const upstream = await fetch(upstreamUrl, {
       method: 'GET',
@@ -105,7 +107,7 @@ export default {
 
     const normalizedPayload = {
       ...payload,
-      events: normalizeAllDayEvents(payload.events || [], requestUrl.searchParams.get('localDate') || ''),
+      events: normalizeAllDayEvents(payload.events || [], localDate),
     };
 
     const headers = new Headers();
