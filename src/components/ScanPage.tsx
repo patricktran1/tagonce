@@ -106,6 +106,33 @@ function cardContext(payload: ShareCardPayload) {
   return 'Personal connection';
 }
 
+function eventMeetingContext(payload: ShareCardPayload | null) {
+  if (!payload) return '';
+  return [payload.eventName, payload.eventLocation].filter(Boolean).join(' · ');
+}
+
+function sharedEventTime(payload: ShareCardPayload) {
+  if (!payload.eventStartAt) return '';
+  const start = new Date(payload.eventStartAt);
+  if (Number.isNaN(start.getTime())) return '';
+  const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+  const end = payload.eventEndAt ? new Date(payload.eventEndAt) : null;
+  return end && !Number.isNaN(end.getTime())
+    ? `${day.format(start)} · ${time.format(start)}–${time.format(end)}`
+    : `${day.format(start)} · ${time.format(start)}`;
+}
+
+function safeEventUrl(value?: string) {
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : '';
+  } catch {
+    return '';
+  }
+}
+
 function conciseLocation(result: ReverseGeocodeResult, latitude: number, longitude: number) {
   const address = result.address ?? {};
   const landmark = result.name
@@ -164,7 +191,7 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
   const [input, setInput] = useState(initial.input);
   const [payload, setPayload] = useState<ShareCardPayload | null>(initial.payload);
   const [error, setError] = useState(initial.error);
-  const [metAt, setMetAt] = useState(initial.payload?.eventName ?? '');
+  const [metAt, setMetAt] = useState(eventMeetingContext(initial.payload));
   const [notes, setNotes] = useState('');
   const [memoryPhoto, setMemoryPhoto] = useState('');
   const [photoError, setPhotoError] = useState('');
@@ -186,6 +213,8 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
     [payload],
   );
 
+  const eventTime = payload ? sharedEventTime(payload) : '';
+  const eventUrl = safeEventUrl(payload?.eventUrl);
   const expired = Boolean(payload?.expiresAt && new Date(payload.expiresAt).getTime() < Date.now());
 
   useEffect(() => {
@@ -254,7 +283,7 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
     try {
       const decoded = decodeCardPayload(token);
       setPayload(decoded);
-      setMetAt(decoded.eventName ?? '');
+      setMetAt(eventMeetingContext(decoded));
       setError('');
       setLocationError('');
       setLocationNote(decoded.eventName ? 'Event context filled from this TagOnce card.' : '');
@@ -316,7 +345,7 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
 
   function useEventContext() {
     if (!payload?.eventName) return;
-    setMetAt(payload.eventName);
+    setMetAt(eventMeetingContext(payload));
     setLocationError('');
     setLocationNote('Event context restored from the scanned TagOnce card.');
   }
@@ -386,7 +415,7 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
       phone: payload.profile.phone,
       whatsapp: payload.profile.whatsapp,
       website: payload.profile.website,
-      metAt: metAt || payload.eventName,
+      metAt: metAt || eventMeetingContext(payload),
       metOn: new Date().toISOString(),
       notes,
       memoryPhotoDataUrl: memoryPhoto || undefined,
@@ -461,6 +490,15 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
               {payload.profile.whatsapp && <span><strong>WhatsApp</strong>{payload.profile.whatsapp}</span>}
               {payload.profile.website && <span><strong>Website</strong>{payload.profile.website}</span>}
             </div>
+
+            {payload.eventName && (eventTime || payload.eventLocation || eventUrl) && (
+              <div className="received-event-context">
+                <span className="received-event-context-title"><CalendarDays size={16} /><strong>{payload.eventName}</strong></span>
+                {eventTime && <span><CalendarDays size={14} /> {eventTime}</span>}
+                {payload.eventLocation && <span><MapPin size={14} /> {payload.eventLocation}</span>}
+                {eventUrl && <a href={eventUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open event page</a>}
+              </div>
+            )}
 
             <div className="received-socials">
               {socialEntries.map(([platform, identity]) => {
