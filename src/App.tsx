@@ -21,7 +21,7 @@ import { DashboardPage } from './components/DashboardPage';
 import { EventCardLauncher } from './components/EventCardLauncher';
 import { Header } from './components/Header';
 import { MyCardsPage } from './components/MyCardsPage';
-import { ScanPage } from './components/ScanPage';
+import { ScanExchangePage } from './components/ScanExchangePage';
 import { SettingsPage } from './components/SettingsPage';
 import { Sidebar, type PageKey } from './components/Sidebar';
 import { defaultBrandSettings, demoEntities } from './data/demo';
@@ -92,7 +92,7 @@ const pageMeta: Record<PageKey, { title: string; eyebrow: string }> = {
   dashboard: { title: 'Dashboard', eyebrow: 'Identity workspace overview' },
   event: { title: 'Event launcher', eyebrow: 'Links, calendar invites and Google Calendar' },
   mycard: { title: 'My QR cards', eyebrow: 'Contextual identity exchange' },
-  scan: { title: 'Receive card', eyebrow: 'Save the person and the moment' },
+  scan: { title: 'Exchange cards', eyebrow: 'Save the person, the moment and the handshake' },
   address: { title: 'Address book', eyebrow: 'Social contacts and memories' },
   compose: { title: 'Create post', eyebrow: 'Tag-ready content workspace' },
   connections: { title: 'Social accounts', eyebrow: 'Your publishing identities' },
@@ -232,7 +232,15 @@ export default function App() {
       case 'mycard':
         return <MyCardsPage profile={profile} connections={connections} onChange={setProfile} />;
       case 'scan':
-        return <ScanPage onSaveContact={mergeScannedContact} onOpenAddressBook={() => setActivePage('address')} />;
+        return (
+          <ScanExchangePage
+            profile={profile}
+            connections={connections}
+            onSaveContact={mergeScannedContact}
+            onOpenAddressBook={() => setActivePage('address')}
+            onOpenMyCards={() => setActivePage('mycard')}
+          />
+        );
       case 'address':
         return (
           <AddressBookPage
