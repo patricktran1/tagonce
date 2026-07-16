@@ -24,7 +24,7 @@ import { MyCardsPage } from './components/MyCardsPage';
 import { ScanExchangePage } from './components/ScanExchangePage';
 import { SettingsPage } from './components/SettingsPage';
 import { Sidebar, type PageKey } from './components/Sidebar';
-import { defaultBrandSettings, demoEntities } from './data/demo';
+import { defaultBrandSettings } from './data/demo';
 import {
   clearRememberedGoogleCalendarAccount,
   connectGoogleCalendar,
@@ -48,7 +48,8 @@ const CAMPAIGN_KEY = 'tagonce.campaigns.v1';
 const BRAND_KEY = 'tagonce.brand.v1';
 const CONNECTION_KEY = 'tagonce.connections.v1';
 const PROFILE_KEY = 'tagonce.profile.v1';
-const WORKSPACE_KEYS = [ENTITY_KEY, CAMPAIGN_KEY, BRAND_KEY, CONNECTION_KEY, PROFILE_KEY];
+const EXCHANGE_RECEIPT_KEY = 'tagonce.exchange.receipts.v1';
+const WORKSPACE_KEYS = [ENTITY_KEY, CAMPAIGN_KEY, BRAND_KEY, CONNECTION_KEY, PROFILE_KEY, EXCHANGE_RECEIPT_KEY];
 
 const defaultConnections: SocialConnection[] = [
   { platform: 'linkedin', connected: false, accountType: 'Personal profile or company page' },
@@ -57,13 +58,13 @@ const defaultConnections: SocialConnection[] = [
 ];
 
 const defaultProfile: MyProfile = {
-  displayName: 'Patrick Tran',
-  title: 'Founder',
-  company: 'AION EHR',
+  displayName: '',
+  title: '',
+  company: '',
   email: '',
   phone: '',
   whatsapp: '',
-  website: 'https://aionehr.com',
+  website: '',
   eventName: '',
   eventEndsAt: new Date().toISOString().slice(0, 10),
   eventStartAt: '',
@@ -121,7 +122,7 @@ function initialPage(): PageKey {
 
 export default function App() {
   const [activePage, setActivePage] = useState<PageKey>(initialPage);
-  const [entities, setEntities] = useState<MentionEntity[]>(() => loadLocal(ENTITY_KEY, demoEntities));
+  const [entities, setEntities] = useState<MentionEntity[]>(() => loadLocal(ENTITY_KEY, []));
   const [campaigns, setCampaigns] = useState<Campaign[]>(() => loadLocal(CAMPAIGN_KEY, []));
   const [brand, setBrand] = useState<BrandSettings>(() => loadLocal(BRAND_KEY, defaultBrandSettings));
   const [connections, setConnections] = useState<SocialConnection[]>(() => loadLocal(CONNECTION_KEY, defaultConnections));
@@ -236,6 +237,7 @@ export default function App() {
           <ScanExchangePage
             profile={profile}
             connections={connections}
+            onChangeProfile={setProfile}
             onSaveContact={mergeScannedContact}
             onOpenAddressBook={() => setActivePage('address')}
             onOpenMyCards={() => setActivePage('mycard')}
