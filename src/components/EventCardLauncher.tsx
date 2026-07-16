@@ -60,20 +60,56 @@ function GoogleMark() {
   );
 }
 
+function dateFromDateOnly(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function addDaysToDateOnly(value: string, days: number) {
+  const date = dateFromDateOnly(value);
+  date.setDate(date.getDate() + days);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function eventTimeLabel(event: CalendarEventSuggestion) {
+  const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  if (event.allDay) return `${day.format(dateFromDateOnly(event.start))} · All day`;
+
   const start = new Date(event.start);
   const end = new Date(event.end);
-  const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
   return `${day.format(start)} · ${time.format(start)}–${time.format(end)}`;
 }
 
 function localDateValue(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const date = new Date(value);
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function eventBoundaries(event: CalendarEventSuggestion) {
+  if (!event.allDay) {
+    return {
+      startAt: event.start,
+      endAt: event.end,
+      endsOn: localDateValue(event.end),
+    };
+  }
+
+  const localStart = dateFromDateOnly(event.start);
+  const localEndExclusive = dateFromDateOnly(event.end);
+  const localEnd = new Date(localEndExclusive.getTime() - 1);
+  return {
+    startAt: localStart.toISOString(),
+    endAt: localEnd.toISOString(),
+    endsOn: addDaysToDateOnly(event.end, -1),
+  };
 }
 
 export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardLauncherProps) {
@@ -169,15 +205,17 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     const nextEventSelection = currentEventSelection.includes('eventName')
       ? currentEventSelection
       : [...currentEventSelection, 'eventName' as const];
+    const boundaries = eventBoundaries(event);
 
     onChange({
       ...profile,
       eventName: event.title,
-      eventStartAt: event.start,
-      eventEndAt: event.end,
-      eventEndsAt: localDateValue(event.end),
+      eventStartAt: boundaries.startAt,
+      eventEndAt: boundaries.endAt,
+      eventEndsAt: boundaries.endsOn,
       eventLocation: event.location,
       eventUrl: event.htmlLink || '',
+      eventDescription: event.allDay ? 'All-day event' : event.description,
       cardSelections: {
         ...profile.cardSelections,
         event: nextEventSelection,
