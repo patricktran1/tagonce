@@ -125,6 +125,15 @@ export function Header({
                 </span>
               </div>
 
+              {!connected && (
+                <div className="account-menu-section account-menu-google-first" role="none">
+                  <button type="button" role="menuitem" onClick={() => navigate(onConnectGoogle)}>
+                    <LogIn size={17} />
+                    <span><strong>Continue with Google</strong><small>Create your profile and connect Calendar</small></span>
+                  </button>
+                </div>
+              )}
+
               <div className="account-menu-section" role="none">
                 <button type="button" role="menuitem" onClick={() => navigate(onOpenProfile)}>
                   <IdCard size={17} />
@@ -136,25 +145,18 @@ export function Header({
                 </button>
               </div>
 
-              <div className="account-menu-section" role="none">
-                {connected ? (
-                  <>
-                    <button type="button" role="menuitem" disabled={Boolean(busy)} onClick={() => void run('switch', onSwitchGoogle)}>
-                      <Repeat2 size={17} />
-                      <span><strong>{busy === 'switch' ? 'Opening Google…' : 'Switch Google account'}</strong><small>Use another Google profile and Calendar</small></span>
-                    </button>
-                    <button type="button" role="menuitem" disabled={Boolean(busy)} onClick={() => void run('logout', onLogout)}>
-                      <LogOut size={17} />
-                      <span><strong>{busy === 'logout' ? 'Signing out…' : 'Sign out'}</strong><small>Disconnect Google on this device</small></span>
-                    </button>
-                  </>
-                ) : (
-                  <button type="button" role="menuitem" onClick={() => navigate(onConnectGoogle)}>
-                    <LogIn size={17} />
-                    <span><strong>Continue with Google</strong><small>Create your profile and connect Calendar</small></span>
+              {connected && (
+                <div className="account-menu-section" role="none">
+                  <button type="button" role="menuitem" disabled={Boolean(busy)} onClick={() => void run('switch', onSwitchGoogle)}>
+                    <Repeat2 size={17} />
+                    <span><strong>{busy === 'switch' ? 'Opening Google…' : 'Switch Google account'}</strong><small>Use another Google profile and Calendar</small></span>
                   </button>
-                )}
-              </div>
+                  <button type="button" role="menuitem" disabled={Boolean(busy)} onClick={() => void run('logout', onLogout)}>
+                    <LogOut size={17} />
+                    <span><strong>{busy === 'logout' ? 'Signing out…' : 'Sign out'}</strong><small>Disconnect Google on this device</small></span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
