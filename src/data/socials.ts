@@ -3,6 +3,7 @@ import type { Platform, SharedSocialIdentity, SocialPlatform } from '../types';
 
 export const coreSocialPlatforms: SocialPlatform[] = [
   'linkedin',
+  'github',
   'instagram',
   'facebook',
   'x',
@@ -14,7 +15,6 @@ export const optionalSocialPlatforms: SocialPlatform[] = [
   'youtube',
   'snapchat',
   'pinterest',
-  'github',
 ];
 
 export const allSocialPlatforms: SocialPlatform[] = [
@@ -48,8 +48,8 @@ export const socialPlatformMeta: Record<
   github: {
     label: 'GitHub',
     short: 'GH',
-    description: 'Developer profile and projects',
-    action: 'View profile',
+    description: 'Developer profile, projects and code',
+    action: 'View projects',
   },
 };
 
