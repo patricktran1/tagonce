@@ -7,6 +7,7 @@ import {
   type CalendarConnectionState,
 } from '../lib/calendarService';
 import type { MentionEntity, MyProfile, ShareCardPayload, SocialConnection } from '../types';
+import { ProfileAvatar } from './ProfileAvatar';
 import { ReciprocalExchangePanel } from './ReciprocalExchangePanel';
 import { ScanPage } from './ScanPage';
 
@@ -61,6 +62,13 @@ export function ScanExchangePage({
     connectGoogleCalendar();
   }
 
+  function saveContactWithAvatar(entity: MentionEntity) {
+    onSaveContact({
+      ...entity,
+      avatarUrl: incoming?.profile.avatarUrl || entity.avatarUrl,
+    });
+  }
+
   return (
     <div className="scan-exchange-page">
       <section className={`mobile-google-device-status state-${calendarState}`} aria-label="Google Calendar status on this device">
@@ -92,7 +100,22 @@ export function ScanExchangePage({
         )}
       </section>
 
-      <ScanPage onSaveContact={onSaveContact} onOpenAddressBook={onOpenAddressBook} />
+      {incoming?.profile.avatarUrl && (
+        <section className="incoming-avatar-banner" aria-label={`${incoming.profile.displayName} profile photo`}>
+          <ProfileAvatar
+            name={incoming.profile.displayName}
+            src={incoming.profile.avatarUrl}
+            className="incoming-card-avatar"
+          />
+          <span>
+            <small>TAGONCE PROFILE</small>
+            <strong>{incoming.profile.displayName}</strong>
+            <p>{[incoming.profile.title, incoming.profile.company].filter(Boolean).join(' · ') || 'Shared a contact card with you'}</p>
+          </span>
+        </section>
+      )}
+
+      <ScanPage onSaveContact={saveContactWithAvatar} onOpenAddressBook={onOpenAddressBook} />
       {incoming && (
         <ReciprocalExchangePanel
           incoming={incoming}
