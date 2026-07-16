@@ -14,6 +14,7 @@ export interface CalendarEventSuggestion {
   start: string;
   end: string;
   htmlLink?: string;
+  allDay?: boolean;
   relevance: 'happening_now' | 'starting_soon' | 'recently_ended' | 'today';
   matchesCard: boolean;
 }
@@ -30,6 +31,13 @@ const GOOGLE_ACCOUNT_KEY = 'tagonce.google.calendar.account.v1';
 
 function validEmail(value = '') {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 async function readJson<T>(response: Response) {
@@ -120,11 +128,10 @@ export async function getCalendarStatus() {
 }
 
 export async function getCalendarEventSuggestions(eventName = '') {
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({ localDate: localDateKey() });
   if (eventName.trim()) params.set('eventName', eventName.trim());
-  const suffix = params.size ? `?${params.toString()}` : '';
   const { response, payload } = await readJson<CalendarEventResponse>(
-    await fetch(`/api/google-calendar/active-event${suffix}`, {
+    await fetch(`/api/google-calendar/active-event?${params.toString()}`, {
       credentials: 'include',
       cache: 'no-store',
     }),
