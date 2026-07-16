@@ -189,6 +189,12 @@ function calendarDate(value: { dateTime?: string; date?: string } | undefined) {
   return /^\d{4}-\d{2}-\d{2}/.test(dateTime) ? dateTime.slice(0, 10) : '';
 }
 
+function addCalendarDays(value: string, days: number) {
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return date.toISOString().slice(0, 10);
+}
+
 function normalize(value = '') {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
@@ -203,6 +209,12 @@ function validDateOnly(value = '') {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function requestedRangeDays(value = ''): 1 | 7 | 30 {
+  if (value === '7') return 7;
+  if (value === '30') return 30;
+  return 1;
+}
+
 function declined(event: GoogleCalendarEvent) {
   return event.attendees?.some((attendee) => attendee.self && attendee.responseStatus === 'declined') ?? false;
 }
@@ -212,6 +224,7 @@ function rankEvent(
   now: number,
   requestedEventName: string,
   requestedLocalDate: string,
+  rangeDays: 1 | 7 | 30,
 ) {
   const start = eventTime(event.start);
   const end = eventTime(event.end, true);
@@ -219,9 +232,16 @@ function rankEvent(
 
   const startsIn = (start - now) / 60_000;
   const endedAgo = (now - end) / 60_000;
+  const eventDate = calendarDate(event.start);
+  const rangeEndDate = validDateOnly(requestedLocalDate)
+    ? addCalendarDays(requestedLocalDate, rangeDays)
+    : '';
   const occursOnRequestedDay = validDateOnly(requestedLocalDate)
-    && calendarDate(event.start) === requestedLocalDate;
-  let relevance: 'happening_now' | 'starting_soon' | 'recently_ended' | 'today';
+    && eventDate === requestedLocalDate;
+  const occursInRequestedRange = validDateOnly(requestedLocalDate)
+    && eventDate >= requestedLocalDate
+    && eventDate < rangeEndDate;
+  let relevance: 'happening_now' | 'starting_soon' | 'recently_ended' | 'today' | 'upcoming';
   let score: number;
 
   if (start <= now && end >= now) {
@@ -229,23 +249,26 @@ function rankEvent(
     score = 140;
   } else if (startsIn > 0 && startsIn <= 180) {
     relevance = 'starting_soon';
-    score = 105 - startsIn / 6;
-  } else if (endedAgo > 0 && endedAgo <= 120) {
+    score = 110 - startsIn / 6;
+  } else if (endedAgo > 0 && endedAgo <= 120 && occursOnRequestedDay) {
     relevance = 'recently_ended';
     score = 80 - endedAgo / 6;
   } else if (occursOnRequestedDay) {
     relevance = 'today';
-    score = startsIn > 0 ? 58 - Math.min(startsIn, 720) / 60 : 40;
+    score = startsIn > 0 ? 65 - Math.min(startsIn, 720) / 60 : 40;
+  } else if (rangeDays > 1 && startsIn > 0 && occursInRequestedRange) {
+    relevance = 'upcoming';
+    score = 50 - Math.min(startsIn, rangeDays * 1440) / (rangeDays * 72);
   } else {
     return null;
   }
 
   const title = event.summary?.trim() || 'Calendar event';
-  if (event.location?.trim()) score += 18;
+  if (event.location?.trim()) score += 4;
   if (requestedEventName && eventNameMatch(title, requestedEventName)) score += 55;
-  if (event.eventType === 'fromGmail') score += 6;
-  if (event.transparency === 'transparent') score -= 15;
-  if (event.start?.date) score -= 12;
+  if (event.eventType === 'fromGmail') score += 3;
+  if (event.transparency === 'transparent') score -= 8;
+  if (event.start?.date) score -= 4;
 
   return {
     id: event.id || `${title}-${start}`,
@@ -270,12 +293,14 @@ async function handleEvents(request: Request, appConfig: NonNullable<ReturnType<
     const session = await refreshSession(stored, appConfig);
     const now = Date.now();
     const url = new URL(request.url);
+    const rangeDays = requestedRangeDays(url.searchParams.get('days') || '');
+    const lookaheadHours = rangeDays === 1 ? 14 : rangeDays * 24 + 12;
     const params = new URLSearchParams({
       timeMin: new Date(now - 6 * 60 * 60 * 1000).toISOString(),
-      timeMax: new Date(now + 14 * 60 * 60 * 1000).toISOString(),
+      timeMax: new Date(now + lookaheadHours * 60 * 60 * 1000).toISOString(),
       singleEvents: 'true',
       orderBy: 'startTime',
-      maxResults: '50',
+      maxResults: rangeDays === 30 ? '250' : '100',
       showDeleted: 'false',
     });
     const googleResponse = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`, {
@@ -286,12 +311,13 @@ async function handleEvents(request: Request, appConfig: NonNullable<ReturnType<
 
     const requested = url.searchParams.get('eventName')?.trim() || '';
     const requestedLocalDate = url.searchParams.get('localDate')?.trim() || '';
+    const resultLimit = rangeDays === 1 ? 8 : rangeDays === 7 ? 16 : 24;
     const events = (payload.items || [])
       .filter((event) => event.status !== 'cancelled' && !declined(event))
-      .map((event) => rankEvent(event, now, requested, requestedLocalDate))
+      .map((event) => rankEvent(event, now, requested, requestedLocalDate, rangeDays))
       .filter((event): event is NonNullable<typeof event> => Boolean(event))
       .sort((left, right) => right.score - left.score)
-      .slice(0, 8)
+      .slice(0, resultLimit)
       .map(({ score: _score, ...event }) => event);
 
     const headers = new Headers();
@@ -302,7 +328,13 @@ async function handleEvents(request: Request, appConfig: NonNullable<ReturnType<
         60 * 60 * 24 * 180,
       ));
     }
-    return json({ configured: true, connected: true, checkedAt: new Date(now).toISOString(), events }, 200, headers);
+    return json({
+      configured: true,
+      connected: true,
+      checkedAt: new Date(now).toISOString(),
+      rangeDays,
+      events,
+    }, 200, headers);
   } catch (error) {
     return json({
       configured: true,
