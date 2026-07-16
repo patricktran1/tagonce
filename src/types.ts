@@ -60,6 +60,7 @@ export interface MentionEntity {
   phone?: string;
   whatsapp?: string;
   website?: string;
+  avatarUrl?: string;
   metAt?: string;
   metOn?: string;
   notes?: string;
@@ -141,6 +142,7 @@ export interface MyProfile {
   phone: string;
   whatsapp: string;
   website: string;
+  avatarUrl?: string;
   eventName: string;
   eventEndsAt: string;
   eventStartAt?: string;
@@ -164,6 +166,7 @@ export interface ShareCardPayload {
   eventUrl?: string;
   profile: {
     displayName: string;
+    avatarUrl?: string;
     title?: string;
     company?: string;
     email?: string;
@@ -172,4 +175,21 @@ export interface ShareCardPayload {
     website?: string;
   };
   socials: Partial<Record<SocialPlatform, SharedSocialIdentity>>;
+}
+
+export interface GoogleAccountIdentity {
+  email: string;
+  displayName?: string;
+  picture?: string;
+}
+
+export interface CloudWorkspace {
+  version: 1;
+  updatedAt: string;
+  profile: MyProfile;
+  entities: MentionEntity[];
+  campaigns: Campaign[];
+  brand: BrandSettings;
+  connections: SocialConnection[];
+  exchangeReceipts?: Record<string, unknown>;
 }
