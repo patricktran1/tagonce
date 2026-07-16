@@ -20,6 +20,7 @@ import {
   getCalendarStatus,
   type CalendarConnectionState,
   type CalendarEventSuggestion,
+  type CalendarRangeDays,
 } from '../lib/calendarService';
 import type { MyProfile } from '../types';
 import { EventImportPanel } from './EventImportPanel';
@@ -35,7 +36,14 @@ const relevanceLabels: Record<CalendarEventSuggestion['relevance'], string> = {
   starting_soon: 'Starting soon',
   recently_ended: 'Just ended',
   today: 'Today',
+  upcoming: 'Upcoming',
 };
+
+const calendarRanges: Array<{ days: CalendarRangeDays; label: string }> = [
+  { days: 1, label: 'Today' },
+  { days: 7, label: '7 days' },
+  { days: 30, label: '30 days' },
+];
 
 const oauthResultMessages: Record<string, string> = {
   cancelled: 'Google connection was cancelled.',
@@ -120,16 +128,17 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
   const [events, setEvents] = useState<CalendarEventSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [rangeDays, setRangeDays] = useState<CalendarRangeDays>(1);
   const [showCalendarIntegration, setShowCalendarIntegration] = useState(() =>
     new URLSearchParams(window.location.search).has('calendar'),
   );
   const calendarPanelRef = useRef<HTMLElement>(null);
 
-  async function loadEvents() {
+  async function loadEvents(nextRange: CalendarRangeDays = rangeDays) {
     setLoading(true);
     setError('');
     try {
-      const response = await getCalendarEventSuggestions(profile.eventName || '');
+      const response = await getCalendarEventSuggestions(profile.eventName || '', nextRange);
       if (!response.configured) {
         setState('unconfigured');
         setEvents([]);
@@ -179,7 +188,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
           return;
         }
         setShowCalendarIntegration(true);
-        await loadEvents();
+        await loadEvents(1);
       } catch {
         if (!cancelled) {
           setState('disconnected');
@@ -217,6 +226,12 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     const input = document.querySelector<HTMLInputElement>('.event-link-input input');
     input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     window.requestAnimationFrame(() => input?.focus());
+  }
+
+  function changeCalendarRange(nextRange: CalendarRangeDays) {
+    if (nextRange === rangeDays && events.length > 0) return;
+    setRangeDays(nextRange);
+    void loadEvents(nextRange);
   }
 
   async function disconnect() {
@@ -260,7 +275,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
           ? 'Unavailable'
           : 'Not connected';
   const googleAction = state === 'connected'
-    ? 'View nearby events'
+    ? 'View upcoming events'
     : state === 'checking'
       ? 'Checking connection'
       : state === 'connecting'
@@ -268,6 +283,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
         : state === 'unconfigured'
           ? 'Use another source'
           : 'Connect Google';
+  const activeRangeLabel = calendarRanges.find((range) => range.days === rangeDays)?.label || 'Today';
 
   return (
     <div className="page-stack live-event-page">
@@ -303,7 +319,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
             <span className="event-source-copy">
               <small>GOOGLE CALENDAR</small>
               <strong>{state === 'connected' ? 'Calendar linked' : 'Link Google Calendar'}</strong>
-              <p>Automatically find what is happening now or starting soon with read-only access.</p>
+              <p>Browse today’s events or look ahead up to 30 days with read-only access.</p>
             </span>
             <span className={`event-source-status state-${state}`}>{googleStatus}</span>
             <span className="event-source-action">{googleAction} <ArrowRight size={14} /></span>
@@ -340,14 +356,14 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
           aria-expanded={showCalendarIntegration}
         >
           <span className="calendar-detection-icon"><CalendarDays size={20} /></span>
-          <span><strong>Google Calendar events</strong><small>Nearby events from the linked Google account</small></span>
+          <span><strong>Google Calendar events</strong><small>Upcoming events from the linked Google account</small></span>
           <span className={`calendar-integration-pill state-${state}`}>{state === 'connected' ? 'CONNECTED' : 'GOOGLE'}</span>
           <ChevronDown size={18} />
         </button>
 
         {showCalendarIntegration && (
           <div className="calendar-beta-body calendar-integration-body">
-            {(state === 'checking' || state === 'connecting' || loading) && (
+            {(state === 'checking' || state === 'connecting') && (
               <div className="live-event-loading"><Loader2 className="spin" size={19} />
                 {state === 'connecting' ? 'Taking you to Google…' : 'Checking your calendar…'}
               </div>
@@ -377,14 +393,39 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
               </div>
             )}
 
-            {state === 'connected' && !loading && (
+            {state === 'connected' && (
               <div className="calendar-connected-area">
                 <div className="calendar-connected-heading">
-                  <span><CalendarCheck size={17} /><strong>Calendar connected</strong></span>
-                  <button className="button secondary small-button" disabled={loading} onClick={loadEvents}><RefreshCw className={loading ? 'spin' : ''} size={15} /> Refresh</button>
+                  <span><CalendarCheck size={17} /><strong>Upcoming events</strong><small>{activeRangeLabel}</small></span>
+                  <div className="calendar-connected-actions">
+                    <a className="button secondary small-button calendar-open-link" href="https://calendar.google.com/calendar/u/0/r" target="_blank" rel="noreferrer">
+                      <ExternalLink size={15} /> Open Google Calendar
+                    </a>
+                    <button className="button secondary small-button" disabled={loading} onClick={() => void loadEvents(rangeDays)}><RefreshCw className={loading ? 'spin' : ''} size={15} /> Refresh</button>
+                  </div>
                 </div>
-                {events.length === 0 && <div className="live-event-empty"><CalendarDays size={24} /><strong>No nearby event found</strong><span>Import an Apple invitation, paste a public event link, type the event manually, or create a timed Google event and refresh.</span></div>}
-                {events.length > 0 && (
+
+                <div className="calendar-range-toolbar" aria-label="Calendar lookahead range">
+                  <span>Look ahead</span>
+                  <div className="calendar-range-switch">
+                    {calendarRanges.map((range) => (
+                      <button
+                        className={rangeDays === range.days ? 'active' : ''}
+                        type="button"
+                        disabled={loading}
+                        key={range.days}
+                        onClick={() => changeCalendarRange(range.days)}
+                        aria-pressed={rangeDays === range.days}
+                      >
+                        {range.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {loading && <div className="live-event-loading calendar-range-loading"><Loader2 className="spin" size={19} /> Loading {activeRangeLabel.toLowerCase()}…</div>}
+                {!loading && events.length === 0 && <div className="live-event-empty"><CalendarDays size={24} /><strong>No upcoming events in this range</strong><span>Try a longer range, import an Apple invitation, paste a public event link, or enter the event manually.</span></div>}
+                {!loading && events.length > 0 && (
                   <div className="live-event-list">
                     {events.map((event) => (
                       <article className={event.matchesCard ? 'live-event-card matches-card' : 'live-event-card'} key={event.id}>
