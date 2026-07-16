@@ -3,7 +3,10 @@ import {
   CalendarDays,
   ChevronDown,
   CircleHelp,
+  Cloud,
+  CloudOff,
   IdCard,
+  Loader2,
   LogIn,
   LogOut,
   Repeat2,
@@ -11,28 +14,27 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import type { GoogleAccountIdentity } from '../types';
+import type { WorkspaceSyncState } from '../lib/workspaceSync';
+import { ProfileAvatar } from './ProfileAvatar';
 
 interface HeaderProps {
   title: string;
   eyebrow: string;
   profileName: string;
   profileEmail?: string;
+  profileAvatarUrl?: string;
   googleAccount?: string;
+  googleIdentity?: GoogleAccountIdentity | null;
+  syncState: WorkspaceSyncState;
+  syncMessage?: string;
   onOpenProfile: () => void;
   onOpenCalendar: () => void;
   onConnectGoogle: () => void;
+  onEnableSync: () => void;
   onSwitchGoogle: () => Promise<void>;
   onLogout: () => Promise<void>;
   onEraseWorkspace: () => Promise<void>;
-}
-
-function initialsFor(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('') || 'TO';
 }
 
 export function Header({
@@ -40,10 +42,15 @@ export function Header({
   eyebrow,
   profileName,
   profileEmail,
+  profileAvatarUrl,
   googleAccount,
+  googleIdentity,
+  syncState,
+  syncMessage,
   onOpenProfile,
   onOpenCalendar,
   onConnectGoogle,
+  onEnableSync,
   onSwitchGoogle,
   onLogout,
   onEraseWorkspace,
@@ -51,8 +58,11 @@ export function Header({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<'switch' | 'logout' | 'erase' | ''>('');
   const menuRef = useRef<HTMLDivElement>(null);
-  const initials = initialsFor(profileName);
-  const connected = Boolean(googleAccount);
+  const connected = Boolean(googleAccount || googleIdentity?.email);
+  const avatarUrl = profileAvatarUrl || googleIdentity?.picture;
+  const displayName = profileName || googleIdentity?.displayName || 'TagOnce user';
+  const accountEmail = googleIdentity?.email || googleAccount || profileEmail;
+  const cloudActive = syncState === 'synced' || syncState === 'syncing';
 
   useEffect(() => {
     if (!open) return undefined;
@@ -85,6 +95,10 @@ export function Header({
     }
   }
 
+  const statusLabel = cloudActive
+    ? syncState === 'syncing' ? 'Syncing' : 'Cloud synced'
+    : connected ? 'Google connected' : 'Local only';
+
   return (
     <header className="topbar">
       <div>
@@ -113,20 +127,21 @@ export function Header({
             aria-expanded={open}
             onClick={() => setOpen((current) => !current)}
           >
-            <span className="user-avatar">{initials}</span>
+            <ProfileAvatar name={displayName} src={avatarUrl} className="user-avatar" />
             <ChevronDown size={14} />
           </button>
 
           {open && (
             <div className="account-menu" role="menu">
               <div className="account-menu-summary">
-                <span className="user-avatar account-menu-avatar">{initials}</span>
+                <ProfileAvatar name={displayName} src={avatarUrl} className="user-avatar account-menu-avatar" />
                 <span>
-                  <strong>{profileName || 'TagOnce user'}</strong>
-                  <small>{googleAccount || profileEmail || 'Local workspace on this browser'}</small>
+                  <strong>{displayName}</strong>
+                  <small>{accountEmail || 'Local workspace on this browser'}</small>
                 </span>
-                <span className={`account-status-pill${connected ? ' connected' : ''}`}>
-                  {connected ? 'Google connected' : 'Local only'}
+                <span className={`account-status-pill${cloudActive ? ' synced' : connected ? ' connected' : ''}`}>
+                  {syncState === 'syncing' && <Loader2 className="spin" size={11} />}
+                  {statusLabel}
                 </span>
               </div>
 
@@ -144,13 +159,22 @@ export function Header({
               <div className="account-menu-section" role="none">
                 {connected ? (
                   <>
+                    {!cloudActive && (
+                      <button type="button" role="menuitem" onClick={() => navigate(onEnableSync)}>
+                        <Cloud size={17} />
+                        <span>
+                          <strong>Enable cross-device sync</strong>
+                          <small>Store this workspace privately in Google Drive app data</small>
+                        </span>
+                      </button>
+                    )}
                     <button type="button" role="menuitem" disabled={Boolean(busy)} onClick={() => void run('switch', onSwitchGoogle)}>
                       <Repeat2 size={17} />
                       <span><strong>{busy === 'switch' ? 'Opening Google…' : 'Switch Google account'}</strong><small>Choose another signed-in Google user</small></span>
                     </button>
                     <button type="button" role="menuitem" disabled={Boolean(busy)} onClick={() => void run('logout', onLogout)}>
                       <LogOut size={17} />
-                      <span><strong>{busy === 'logout' ? 'Logging out…' : 'Log out'}</strong><small>Disconnect Google; keep local TagOnce data</small></span>
+                      <span><strong>{busy === 'logout' ? 'Logging out…' : 'Log out'}</strong><small>Disconnect Google; keep this browser’s local copy</small></span>
                     </button>
                   </>
                 ) : (
@@ -168,7 +192,14 @@ export function Header({
                 </button>
               </div>
 
-              <p className="account-menu-footnote">TagOnce data is currently stored on this browser. Cloud accounts and cross-device sync are not enabled yet.</p>
+              <p className={`account-menu-footnote${cloudActive ? ' synced' : ''}`}>
+                {cloudActive
+                  ? <><Cloud size={13} /> TagOnce is syncing this workspace across devices through your private Google Drive app data.</>
+                  : connected
+                    ? <><CloudOff size={13} /> Google identity and Calendar are connected. Enable sync to share TagOnce data across devices.</>
+                    : <><CloudOff size={13} /> This workspace is stored only on this browser until Google sync is enabled.</>}
+                {syncMessage && <span>{syncMessage}</span>}
+              </p>
             </div>
           )}
         </div>
