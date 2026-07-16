@@ -1,0 +1,385 @@
+/* Release 0.20: iPhone-safe mobile comfort pass */
+
+@media (max-width: 760px) {
+  html {
+    min-width: 320px;
+    scroll-padding-top: calc(82px + env(safe-area-inset-top));
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    min-width: 320px;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+  }
+
+  .app-shell {
+    min-height: 100dvh;
+    width: 100%;
+    overflow-x: clip;
+  }
+
+  .main-shell,
+  .page-container,
+  .page-stack,
+  .panel,
+  .received-card-layout,
+  .scan-exchange-page,
+  .card-studio-grid,
+  .event-import-layout,
+  .live-event-page {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .page-container {
+    width: 100%;
+    padding: 16px 12px calc(98px + env(safe-area-inset-bottom));
+  }
+
+  .page-stack {
+    gap: 14px;
+  }
+
+  .topbar {
+    min-height: 68px;
+    padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+    gap: 12px;
+  }
+
+  .topbar h1 {
+    margin-top: 0;
+    font-size: 20px;
+    line-height: 1.1;
+  }
+
+  .topbar > div:first-child .eyebrow {
+    display: none;
+  }
+
+  .panel,
+  .hero-panel,
+  .live-event-hero,
+  .event-launcher-hero,
+  .scan-empty-state {
+    border-radius: 18px;
+  }
+
+  .hero-panel,
+  .live-event-hero,
+  .event-launcher-hero {
+    min-height: auto;
+    padding: 20px 18px;
+  }
+
+  .hero-panel h2,
+  .live-event-hero h2,
+  .event-launcher-hero h2 {
+    font-size: clamp(28px, 9vw, 36px);
+    line-height: 1.06;
+  }
+
+  .hero-panel p,
+  .live-event-hero p,
+  .event-launcher-hero p {
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  /* Safari zooms focused controls whose computed font size is below 16px. */
+  input,
+  textarea,
+  select,
+  .field input,
+  .field textarea,
+  .field select,
+  .master-editor textarea,
+  .mapping-input-row input,
+  .mention-input-shell > input,
+  .scan-link-entry input {
+    font-size: 16px !important;
+    line-height: 1.35;
+  }
+
+  input,
+  textarea,
+  select {
+    max-width: 100%;
+  }
+
+  .field input,
+  .field select,
+  .mapping-input-row input,
+  .scan-link-entry input {
+    min-height: 50px;
+    padding: 11px 14px;
+    border-radius: 13px;
+  }
+
+  .field textarea,
+  .master-editor textarea {
+    min-height: 124px;
+    padding: 14px;
+    border-radius: 13px;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    scroll-margin-top: calc(92px + env(safe-area-inset-top));
+    scroll-margin-bottom: 36vh;
+  }
+
+  .field {
+    gap: 7px;
+  }
+
+  .field > span,
+  .field > label,
+  .master-editor > span {
+    font-size: 12px;
+  }
+
+  .two-field-row,
+  .social-profile-inputs,
+  .event-import-field-grid,
+  .event-form-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  .button {
+    min-height: 48px;
+    padding: 0 16px;
+    border-radius: 13px;
+    font-size: 14px;
+  }
+
+  .button.small-button,
+  .small-button {
+    min-height: 44px;
+    padding: 0 13px;
+    font-size: 13px;
+  }
+
+  .text-button {
+    min-height: 44px;
+    padding: 8px 3px;
+    font-size: 13px;
+  }
+
+  .icon-button,
+  .small-icon-button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+  }
+
+  button,
+  a,
+  input,
+  textarea,
+  select,
+  summary {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(112, 82, 216, 0.12);
+  }
+
+  .return-profile-editor-toggle {
+    min-height: 66px;
+    padding: 14px 13px;
+  }
+
+  .return-profile-editor-toggle strong {
+    font-size: 14px;
+  }
+
+  .return-profile-editor-toggle small {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .return-profile-editor-fields {
+    gap: 14px;
+    padding: 14px 13px 18px;
+  }
+
+  .return-required-field > span strong {
+    font-size: 10px;
+  }
+
+  .return-profile-warning {
+    padding: 12px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .reciprocal-exchange-panel {
+    gap: 15px;
+    padding: 16px;
+  }
+
+  .reciprocal-exchange-heading {
+    gap: 11px;
+  }
+
+  .reciprocal-exchange-heading p {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .return-card-preview {
+    gap: 15px;
+    padding: 17px 14px;
+  }
+
+  .return-card-copy strong {
+    font-size: 23px;
+  }
+
+  .return-card-copy p {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  .reciprocal-exchange-actions {
+    gap: 10px;
+  }
+
+  .reciprocal-exchange-actions .button {
+    width: 100%;
+  }
+
+  .mobile-google-device-status {
+    position: relative;
+    padding: 13px;
+    border-radius: 16px;
+  }
+
+  .mobile-google-device-status strong {
+    font-size: 13px;
+    line-height: 1.3;
+  }
+
+  .mobile-google-device-status small {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .mobile-google-device-status button {
+    min-height: 44px;
+    padding: 0 13px;
+    border-radius: 11px;
+    font-size: 13px;
+  }
+
+  .calendar-integration-toggle,
+  .calendar-beta-toggle,
+  .more-networks-button,
+  .memory-camera-cta,
+  .meeting-context-button {
+    min-height: 48px;
+  }
+
+  .meeting-context-button {
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+
+  .received-card-layout {
+    gap: 14px;
+  }
+
+  .received-card-preview,
+  .memory-capture-panel {
+    padding: 18px;
+  }
+
+  .received-card-preview h2 {
+    font-size: 30px;
+    overflow-wrap: anywhere;
+  }
+
+  .received-contact-details,
+  .received-socials,
+  .received-event-context {
+    overflow-wrap: anywhere;
+  }
+
+  .received-socials a,
+  .share-card-social-links a {
+    min-height: 54px;
+  }
+
+  .account-menu-section button {
+    min-height: 58px;
+    padding: 13px 11px;
+  }
+
+  .account-menu-section button strong {
+    font-size: 14px;
+  }
+
+  .account-menu-section button small,
+  .account-menu-footnote {
+    font-size: 12px;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+  }
+
+  p,
+  small,
+  strong,
+  span,
+  a {
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 430px) {
+  .page-container {
+    padding-inline: 10px;
+  }
+
+  .topbar {
+    padding-inline: 12px;
+  }
+
+  .reciprocal-exchange-panel,
+  .received-card-preview,
+  .memory-capture-panel,
+  .pocket-share-card {
+    border-radius: 17px;
+  }
+
+  .return-card-mode-switch {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .return-card-mode-switch button {
+    min-height: 44px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .reciprocal-exchange-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .button.primary:hover:not(:disabled) {
+    transform: none;
+  }
+
+  button:active,
+  a:active {
+    opacity: 0.78;
+  }
+}
