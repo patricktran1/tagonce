@@ -1,0 +1,22 @@
+/* Release 0.25: GitHub-first hackathon social preset */
+.more-networks-button small {
+  font-size: 0;
+}
+
+.more-networks-button small::after {
+  content: 'Threads, TikTok, YouTube, Snapchat and Pinterest';
+  color: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.social-profile-editor-list > .social-profile-editor:nth-child(2) {
+  border-color: #d8cfea;
+  background: linear-gradient(145deg, #fff, #faf8ff);
+}
+
+.social-profile-editor-list > .social-profile-editor:nth-child(2) .social-profile-editor-heading small::after {
+  content: ' · ideal for hackathons';
+  color: #7054bd;
+  font-weight: 700;
+}
