@@ -53,6 +53,31 @@ export const socialPlatformMeta: Record<
   },
 };
 
+function promoteSavedGithubEventPreset() {
+  if (typeof window === 'undefined') return;
+  try {
+    const key = 'tagonce.profile.v1';
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return;
+    const profile = JSON.parse(raw) as {
+      socialProfiles?: Record<string, SharedSocialIdentity | undefined>;
+      cardSelections?: { event?: string[] };
+    };
+    const github = profile.socialProfiles?.github;
+    const event = profile.cardSelections?.event;
+    if (!event || event.includes('social:github') || (!github?.handle && !github?.profileUrl)) return;
+    const next = [...event];
+    const linkedInIndex = next.indexOf('social:linkedin');
+    next.splice(linkedInIndex >= 0 ? linkedInIndex + 1 : next.length, 0, 'social:github');
+    profile.cardSelections = { ...profile.cardSelections, event: next };
+    window.localStorage.setItem(key, JSON.stringify(profile));
+  } catch {
+    // A malformed or unavailable local profile should never block the card editor.
+  }
+}
+
+promoteSavedGithubEventPreset();
+
 function cleanHandle(value = '') {
   return value.trim().replace(/^@/, '');
 }
