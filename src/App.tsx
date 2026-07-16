@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './App.css';
 import './release02.css';
 import './release03.css';
@@ -29,19 +29,14 @@ import {
   clearRememberedGoogleCalendarAccount,
   connectGoogleCalendar,
   disconnectGoogleCalendar,
-  getRememberedGoogleCalendarAccount,
+  getCalendarStatus,
+  getRememberedGoogleIdentity,
   restoreGoogleCalendarReturn,
 } from './lib/calendarService';
 import { loadLocal, saveLocal } from './lib/storage';
-import {
-  loadCloudWorkspace,
-  saveCloudWorkspace,
-  type WorkspaceSyncState,
-} from './lib/workspaceSync';
 import type {
   BrandSettings,
   Campaign,
-  CloudWorkspace,
   GoogleAccountIdentity,
   MentionEntity,
   MyProfile,
@@ -98,15 +93,15 @@ const defaultProfile: MyProfile = {
 };
 
 const pageMeta: Record<PageKey, { title: string; eyebrow: string }> = {
-  dashboard: { title: 'Dashboard', eyebrow: 'Identity workspace overview' },
-  event: { title: 'Event launcher', eyebrow: 'Links, calendar invites and Google Calendar' },
-  mycard: { title: 'My QR cards', eyebrow: 'Contextual identity exchange' },
-  scan: { title: 'Exchange cards', eyebrow: 'Save the person, the moment and the handshake' },
-  address: { title: 'Address book', eyebrow: 'Social contacts and memories' },
-  compose: { title: 'Create post', eyebrow: 'Tag-ready content workspace' },
-  connections: { title: 'Social accounts', eyebrow: 'Your publishing identities' },
-  campaigns: { title: 'Campaigns', eyebrow: 'Publishing history' },
-  settings: { title: 'Brand settings', eyebrow: 'Generation defaults' },
+  dashboard: { title: 'Home', eyebrow: 'Event contact exchange' },
+  event: { title: 'Events & Calendar', eyebrow: 'Create an event QR' },
+  mycard: { title: 'My QR cards', eyebrow: 'Choose what you share' },
+  scan: { title: 'Exchange cards', eyebrow: 'Save the person and the moment' },
+  address: { title: 'Contacts', eyebrow: 'People, context and memories' },
+  compose: { title: 'Post Studio', eyebrow: 'Beta: adapt one post across platforms' },
+  connections: { title: 'Social accounts', eyebrow: 'Beta Studio identities' },
+  campaigns: { title: 'Campaigns', eyebrow: 'Beta Studio history' },
+  settings: { title: 'Brand settings', eyebrow: 'Beta Studio defaults' },
 };
 
 function identitiesMatch(left: MentionEntity, right: MentionEntity) {
@@ -124,53 +119,22 @@ function identitiesMatch(left: MentionEntity, right: MentionEntity) {
 function initialPage(): PageKey {
   const params = new URLSearchParams(window.location.search);
   if (params.has('card')) return 'scan';
-  if (params.get('view') === 'event' || params.has('calendar')) return 'event';
+  if (params.get('view') === 'event') return 'event';
   return 'dashboard';
 }
 
-function readExchangeReceipts() {
-  try {
-    return JSON.parse(window.localStorage.getItem(EXCHANGE_RECEIPT_KEY) || '{}') as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
-
-function writeExchangeReceipts(receipts?: Record<string, unknown>) {
-  try {
-    window.localStorage.setItem(EXCHANGE_RECEIPT_KEY, JSON.stringify(receipts || {}));
-  } catch {
-    // The rest of the cloud workspace can still load when receipts cannot be persisted.
-  }
-}
-
-function profileWithGoogleIdentity(profile: MyProfile, account?: GoogleAccountIdentity) {
-  if (!account) return profile;
-  return {
+function profileWithGoogleIdentity(profile: MyProfile, identity: GoogleAccountIdentity | null) {
+  if (!identity) return profile;
+  const next = {
     ...profile,
-    displayName: profile.displayName || account.displayName || '',
-    email: profile.email || account.email,
-    avatarUrl: profile.avatarUrl || account.picture || '',
+    displayName: profile.displayName || identity.displayName || '',
+    email: profile.email || identity.email,
+    avatarUrl: profile.avatarUrl || identity.picture || '',
   };
-}
-
-function workspaceSnapshot(
-  profile: MyProfile,
-  entities: MentionEntity[],
-  campaigns: Campaign[],
-  brand: BrandSettings,
-  connections: SocialConnection[],
-): CloudWorkspace {
-  return {
-    version: 1,
-    updatedAt: new Date().toISOString(),
-    profile,
-    entities,
-    campaigns,
-    brand,
-    connections,
-    exchangeReceipts: readExchangeReceipts(),
-  };
+  const changed = next.displayName !== profile.displayName
+    || next.email !== profile.email
+    || next.avatarUrl !== profile.avatarUrl;
+  return changed ? next : profile;
 }
 
 export default function App() {
@@ -180,11 +144,8 @@ export default function App() {
   const [brand, setBrand] = useState<BrandSettings>(() => loadLocal(BRAND_KEY, defaultBrandSettings));
   const [connections, setConnections] = useState<SocialConnection[]>(() => loadLocal(CONNECTION_KEY, defaultConnections));
   const [profile, setProfile] = useState<MyProfile>(() => loadLocal(PROFILE_KEY, defaultProfile));
-  const [googleAccount, setGoogleAccount] = useState(() => getRememberedGoogleCalendarAccount());
-  const [googleIdentity, setGoogleIdentity] = useState<GoogleAccountIdentity | null>(null);
-  const [syncState, setSyncState] = useState<WorkspaceSyncState>('checking');
-  const [syncMessage, setSyncMessage] = useState('');
-  const cloudReadyRef = useRef(false);
+  const [googleIdentity, setGoogleIdentity] = useState<GoogleAccountIdentity | null>(() => getRememberedGoogleIdentity());
+  const [calendarConnected, setCalendarConnected] = useState(false);
 
   useEffect(() => saveLocal(ENTITY_KEY, entities), [entities]);
   useEffect(() => saveLocal(CAMPAIGN_KEY, campaigns), [campaigns]);
@@ -193,113 +154,22 @@ export default function App() {
   useEffect(() => saveLocal(PROFILE_KEY, profile), [profile]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function initializeCloudWorkspace() {
-      setSyncState('checking');
-      setSyncMessage('');
-      try {
-        const result = await loadCloudWorkspace();
-        if (cancelled) return;
-
-        if (result.account) {
-          setGoogleIdentity(result.account);
-          setGoogleAccount(result.account.email);
-        }
-
-        if (!result.connected) {
-          cloudReadyRef.current = false;
-          setSyncState('local');
-          return;
-        }
-
-        if (result.code === 'drive_api_disabled') {
-          cloudReadyRef.current = false;
-          setSyncState('error');
-          setSyncMessage('Google Drive API must be enabled once in the Cloud project before sync can start.');
-          return;
-        }
-
-        if (!result.syncEnabled) {
-          const nextProfile = profileWithGoogleIdentity(profile, result.account);
-          if (nextProfile !== profile) setProfile(nextProfile);
-          cloudReadyRef.current = false;
-          setSyncState('authorization_required');
-          return;
-        }
-
-        if (result.workspace) {
-          const cloud = result.workspace;
-          setProfile(profileWithGoogleIdentity(cloud.profile, result.account));
-          setEntities(cloud.entities || []);
-          setCampaigns(cloud.campaigns || []);
-          setBrand(cloud.brand || defaultBrandSettings);
-          setConnections(cloud.connections || defaultConnections);
-          writeExchangeReceipts(cloud.exchangeReceipts);
-        } else {
-          const nextProfile = profileWithGoogleIdentity(profile, result.account);
-          setProfile(nextProfile);
-          const created = await saveCloudWorkspace(workspaceSnapshot(
-            nextProfile,
-            entities,
-            campaigns,
-            brand,
-            connections,
-          ));
-          if (cancelled) return;
-          if (!created.syncEnabled) {
-            cloudReadyRef.current = false;
-            setSyncState('authorization_required');
-            return;
-          }
-        }
-
-        cloudReadyRef.current = true;
-        setSyncState('synced');
-      } catch (error) {
-        if (cancelled) return;
-        cloudReadyRef.current = false;
-        setSyncState('error');
-        setSyncMessage(error instanceof Error ? error.message : 'Cloud sync could not be started.');
-      }
-    }
-
-    void initializeCloudWorkspace();
-    return () => { cancelled = true; };
-  }, []);
+    setProfile((current) => profileWithGoogleIdentity(current, googleIdentity));
+  }, [googleIdentity]);
 
   useEffect(() => {
-    if (!cloudReadyRef.current) return undefined;
-    setSyncState('syncing');
-    const timeout = window.setTimeout(async () => {
+    let cancelled = false;
+    async function checkGoogleConnection() {
       try {
-        const result = await saveCloudWorkspace(workspaceSnapshot(
-          profile,
-          entities,
-          campaigns,
-          brand,
-          connections,
-        ));
-        if (!result.syncEnabled) {
-          cloudReadyRef.current = false;
-          setSyncState('authorization_required');
-          return;
-        }
-        if (result.code === 'drive_api_disabled') {
-          cloudReadyRef.current = false;
-          setSyncState('error');
-          setSyncMessage('Google Drive API must be enabled before TagOnce can sync.');
-          return;
-        }
-        setSyncMessage('');
-        setSyncState('synced');
-      } catch (error) {
-        setSyncState('error');
-        setSyncMessage(error instanceof Error ? error.message : 'The latest changes could not be synced.');
+        const status = await getCalendarStatus();
+        if (!cancelled) setCalendarConnected(status.connected);
+      } catch {
+        if (!cancelled) setCalendarConnected(false);
       }
-    }, 1400);
-    return () => window.clearTimeout(timeout);
-  }, [brand, campaigns, connections, entities, profile]);
+    }
+    void checkGoogleConnection();
+    return () => { cancelled = true; };
+  }, []);
 
   const currentMeta = pageMeta[activePage];
 
@@ -343,46 +213,38 @@ export default function App() {
     });
   }
 
-  function connectFromHeader(selectAccount = false) {
-    connectGoogleCalendar(activePage === 'event' ? 'event' : undefined, '', selectAccount);
-  }
-
-  function enableCloudSync() {
-    connectGoogleCalendar(undefined, '', false, true);
+  function connectGoogle(returnToEvent = false, selectAccount = false) {
+    connectGoogleCalendar(returnToEvent ? 'event' : undefined, '', selectAccount);
   }
 
   async function switchGoogleAccount() {
     try {
       await disconnectGoogleCalendar();
     } catch {
-      // The explicit account chooser can still replace an expired local session.
+      // The account chooser can still replace an expired session.
     }
-    cloudReadyRef.current = false;
     clearRememberedGoogleCalendarAccount();
-    setGoogleAccount('');
     setGoogleIdentity(null);
-    setSyncState('local');
-    connectFromHeader(true);
+    setCalendarConnected(false);
+    setProfile(defaultProfile);
+    connectGoogle(false, true);
   }
 
   async function logout() {
     try {
       await disconnectGoogleCalendar();
     } catch {
-      // Local logout should still complete when the Google session already expired.
+      // Local logout still completes when the Google session already expired.
     }
-    cloudReadyRef.current = false;
     clearRememberedGoogleCalendarAccount();
-    setGoogleAccount('');
     setGoogleIdentity(null);
-    setSyncState('local');
-    setSyncMessage('');
+    setCalendarConnected(false);
     setActivePage('dashboard');
   }
 
   async function eraseWorkspace() {
     const confirmed = window.confirm(
-      'Erase this browser’s TagOnce workspace? This removes the local copy only. A synced cloud copy remains available after you sign in again.',
+      'Erase TagOnce data from this device? This deletes saved contacts, cards, profile edits and Beta Studio drafts stored in this browser.',
     );
     if (!confirmed) return;
 
@@ -391,7 +253,6 @@ export default function App() {
     } catch {
       // Local data erasure does not depend on an active Google session.
     }
-    cloudReadyRef.current = false;
     WORKSPACE_KEYS.forEach((key) => window.localStorage.removeItem(key));
     clearRememberedGoogleCalendarAccount();
     setEntities([]);
@@ -399,17 +260,29 @@ export default function App() {
     setBrand(defaultBrandSettings);
     setConnections(defaultConnections);
     setProfile(defaultProfile);
-    setGoogleAccount('');
     setGoogleIdentity(null);
-    setSyncState('local');
-    setSyncMessage('');
+    setCalendarConnected(false);
     setActivePage('dashboard');
   }
 
   const page = useMemo(() => {
     switch (activePage) {
       case 'dashboard':
-        return <DashboardPage campaigns={campaigns} entities={entities} onCreate={() => setActivePage('compose')} onOpenCampaigns={() => setActivePage('campaigns')} />;
+        return (
+          <DashboardPage
+            profile={profile}
+            googleIdentity={googleIdentity}
+            calendarConnected={calendarConnected}
+            campaigns={campaigns}
+            entities={entities}
+            onConnectGoogle={() => connectGoogle(false)}
+            onOpenEvents={() => setActivePage('event')}
+            onOpenCards={() => setActivePage('mycard')}
+            onExchange={() => setActivePage('scan')}
+            onOpenContacts={() => setActivePage('address')}
+            onOpenBeta={() => setActivePage('compose')}
+          />
+        );
       case 'event':
         return <EventCardLauncher profile={profile} onChange={setProfile} onOpenCards={() => setActivePage('mycard')} />;
       case 'mycard':
@@ -451,11 +324,16 @@ export default function App() {
       case 'settings':
         return <SettingsPage brand={brand} onChange={setBrand} />;
     }
-  }, [activePage, brand, campaigns, connections, entities, profile]);
+  }, [activePage, brand, calendarConnected, campaigns, connections, entities, googleIdentity, profile]);
 
   return (
     <div className="app-shell">
-      <Sidebar activePage={activePage} onNavigate={setActivePage} />
+      <Sidebar
+        activePage={activePage}
+        profileName={profile.displayName || googleIdentity?.displayName || ''}
+        profileAvatarUrl={profile.avatarUrl || googleIdentity?.picture}
+        onNavigate={setActivePage}
+      />
       <main className="main-shell">
         <Header
           title={currentMeta.title}
@@ -463,14 +341,10 @@ export default function App() {
           profileName={profile.displayName}
           profileEmail={profile.email}
           profileAvatarUrl={profile.avatarUrl}
-          googleAccount={googleAccount}
           googleIdentity={googleIdentity}
-          syncState={syncState}
-          syncMessage={syncMessage}
           onOpenProfile={() => setActivePage('mycard')}
           onOpenCalendar={() => setActivePage('event')}
-          onConnectGoogle={() => connectFromHeader(false)}
-          onEnableSync={enableCloudSync}
+          onConnectGoogle={() => connectGoogle(false)}
           onSwitchGoogle={switchGoogleAccount}
           onLogout={logout}
           onEraseWorkspace={eraseWorkspace}
