@@ -41,6 +41,24 @@ function config(request: Request) {
   return { clientId, clientSecret, sessionSecret, redirectUri };
 }
 
+function parseCookies(request: Request) {
+  const values = new Map<string, string>();
+  const header = request.headers.get('cookie') || '';
+  header.split(';').forEach((part) => {
+    const separator = part.indexOf('=');
+    if (separator < 0) return;
+    const name = part.slice(0, separator).trim();
+    const value = part.slice(separator + 1).trim();
+    if (!name) return;
+    try {
+      values.set(name, decodeURIComponent(value));
+    } catch {
+      values.set(name, value);
+    }
+  });
+  return values;
+}
+
 function cookie(name: string, value: string, maxAge: number) {
   return `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${Math.max(0, Math.floor(maxAge))}; HttpOnly; Secure; SameSite=Lax`;
 }
@@ -64,7 +82,7 @@ function base64UrlDecode(value: string) {
 
 async function encryptionKey(secret: string) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(secret));
-  return crypto.subtle.importKey('raw', digest, { name: 'AES-GCM' }, false, ['encrypt']);
+  return crypto.subtle.importKey('raw', digest, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
 }
 
 async function encryptSession(session: CalendarSession, secret: string) {
@@ -79,6 +97,23 @@ async function encryptSession(session: CalendarSession, secret: string) {
   packed.set(iv);
   packed.set(encrypted, iv.length);
   return base64UrlEncode(packed);
+}
+
+async function decryptSession(value: string | undefined, secret: string): Promise<CalendarSession | null> {
+  if (!value) return null;
+  try {
+    const packed = base64UrlDecode(value);
+    if (packed.length < 29) return null;
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: packed.slice(0, 12) },
+      await encryptionKey(secret),
+      packed.slice(12),
+    );
+    const session = JSON.parse(new TextDecoder().decode(plaintext)) as CalendarSession;
+    return session.accessToken && Number.isFinite(session.expiresAt) ? session : null;
+  } catch {
+    return null;
+  }
 }
 
 async function hmacKey(secret: string) {
@@ -150,6 +185,11 @@ export default {
     if (!code) return redirect(request, 'authorization_incomplete');
     if (!(await verifySignedState(state, appConfig.sessionSecret))) return redirect(request, 'invalid_state');
 
+    const existing = await decryptSession(
+      parseCookies(request).get(SESSION_COOKIE),
+      appConfig.sessionSecret,
+    );
+
     let token: GoogleTokenResponse;
     try {
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -189,14 +229,15 @@ export default {
         : '';
       if (!email) return redirect(request, 'identity_email');
 
+      const sameAccount = existing?.email?.toLowerCase() === email.toLowerCase();
       const session: CalendarSession = {
         accessToken: token.access_token,
-        refreshToken: token.refresh_token,
+        refreshToken: token.refresh_token || (sameAccount ? existing?.refreshToken : undefined),
         expiresAt: Date.now() + Math.max(60, token.expires_in || 3600) * 1000,
         scope: token.scope,
         email,
-        displayName: typeof payload.name === 'string' ? payload.name : undefined,
-        picture: typeof payload.picture === 'string' ? payload.picture : undefined,
+        displayName: typeof payload.name === 'string' ? payload.name : existing?.displayName,
+        picture: typeof payload.picture === 'string' ? payload.picture : existing?.picture,
       };
       const sessionValue = await encryptSession(session, appConfig.sessionSecret);
       return redirect(request, 'connected', [
