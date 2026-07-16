@@ -1,3 +1,5 @@
+import type { GoogleAccountIdentity } from '../types';
+
 export type CalendarConnectionState = 'checking' | 'connecting' | 'connected' | 'disconnected' | 'unconfigured';
 
 export interface CalendarStatusResponse {
@@ -28,9 +30,20 @@ interface CalendarEventResponse extends CalendarStatusResponse {
 
 const CALENDAR_RETURN_KEY = 'tagonce.calendar.return.v2';
 const GOOGLE_ACCOUNT_KEY = 'tagonce.google.calendar.account.v1';
+const GOOGLE_IDENTITY_KEY = 'tagonce.google.identity.v1';
 
 function validEmail(value = '') {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function safePicture(value = '') {
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : '';
+  } catch {
+    return '';
+  }
 }
 
 function localDateKey(date = new Date()) {
@@ -46,21 +59,37 @@ async function readJson<T>(response: Response) {
 }
 
 export function getRememberedGoogleCalendarAccount() {
-  if (typeof window === 'undefined') return '';
+  return getRememberedGoogleIdentity()?.email || '';
+}
+
+export function getRememberedGoogleIdentity(): GoogleAccountIdentity | null {
+  if (typeof window === 'undefined') return null;
   try {
-    const value = window.localStorage.getItem(GOOGLE_ACCOUNT_KEY) || '';
-    return validEmail(value) ? value : '';
+    const value = JSON.parse(window.localStorage.getItem(GOOGLE_IDENTITY_KEY) || 'null') as GoogleAccountIdentity | null;
+    if (!value || !validEmail(value.email)) return null;
+    return {
+      email: value.email.trim().toLowerCase(),
+      displayName: value.displayName?.trim() || undefined,
+      picture: safePicture(value.picture) || undefined,
+    };
   } catch {
-    return '';
+    const legacy = window.localStorage.getItem(GOOGLE_ACCOUNT_KEY) || '';
+    return validEmail(legacy) ? { email: legacy.trim().toLowerCase() } : null;
   }
 }
 
-export function rememberGoogleCalendarAccount(email: string) {
-  if (typeof window === 'undefined' || !validEmail(email)) return;
+export function rememberGoogleIdentity(identity: GoogleAccountIdentity) {
+  if (typeof window === 'undefined' || !validEmail(identity.email)) return;
+  const normalized: GoogleAccountIdentity = {
+    email: identity.email.trim().toLowerCase(),
+    displayName: identity.displayName?.trim() || undefined,
+    picture: safePicture(identity.picture) || undefined,
+  };
   try {
-    window.localStorage.setItem(GOOGLE_ACCOUNT_KEY, email.trim().toLowerCase());
+    window.localStorage.setItem(GOOGLE_ACCOUNT_KEY, normalized.email);
+    window.localStorage.setItem(GOOGLE_IDENTITY_KEY, JSON.stringify(normalized));
   } catch {
-    // Calendar OAuth still works when local storage is unavailable.
+    // The secure Google session remains active when local storage is unavailable.
   }
 }
 
@@ -68,8 +97,9 @@ export function clearRememberedGoogleCalendarAccount() {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.removeItem(GOOGLE_ACCOUNT_KEY);
+    window.localStorage.removeItem(GOOGLE_IDENTITY_KEY);
   } catch {
-    // The secure Calendar session can still be disconnected independently.
+    // The secure Google session can still be disconnected independently.
   }
 }
 
@@ -77,8 +107,10 @@ export function restoreGoogleCalendarReturn() {
   if (typeof window === 'undefined') return;
   const current = new URL(window.location.href);
   const result = current.searchParams.get('calendar');
-  const verifiedGoogleAccount = current.searchParams.get('google_account') || '';
-  if (verifiedGoogleAccount) rememberGoogleCalendarAccount(verifiedGoogleAccount);
+  const email = current.searchParams.get('google_account') || '';
+  const displayName = current.searchParams.get('google_name') || '';
+  const picture = current.searchParams.get('google_picture') || '';
+  if (validEmail(email)) rememberGoogleIdentity({ email, displayName, picture });
   if (!result) return;
 
   let saved = '';
@@ -86,12 +118,18 @@ export function restoreGoogleCalendarReturn() {
     saved = window.sessionStorage.getItem(CALENDAR_RETURN_KEY) || '';
     window.sessionStorage.removeItem(CALENDAR_RETURN_KEY);
   } catch {
-    // The callback can still open the Event Launcher without session storage.
+    // The callback can still open the dashboard without session storage.
   }
 
+  const cleanup = (url: URL) => {
+    url.searchParams.delete('google_account');
+    url.searchParams.delete('google_name');
+    url.searchParams.delete('google_picture');
+    return `${url.pathname}${url.search}${url.hash}`;
+  };
+
   if (!saved) {
-    current.searchParams.delete('google_account');
-    window.history.replaceState({}, '', `${current.pathname}${current.search}${current.hash}`);
+    window.history.replaceState({}, '', cleanup(current));
     return;
   }
 
@@ -99,9 +137,9 @@ export function restoreGoogleCalendarReturn() {
     const target = new URL(saved, window.location.origin);
     if (target.origin !== window.location.origin) return;
     target.searchParams.set('calendar', result);
-    window.history.replaceState({}, '', `${target.pathname}${target.search}${target.hash}`);
+    window.history.replaceState({}, '', cleanup(target));
   } catch {
-    // Ignore an invalid saved target and keep the callback URL.
+    window.history.replaceState({}, '', cleanup(current));
   }
 }
 
@@ -123,7 +161,7 @@ export async function getCalendarStatus() {
       cache: 'no-store',
     }),
   );
-  if (!response.ok) throw new Error('Calendar connection status could not be checked.');
+  if (!response.ok) throw new Error('Google connection status could not be checked.');
   return payload;
 }
 
@@ -143,19 +181,13 @@ export async function getCalendarEventSuggestions(eventName = '') {
   return payload;
 }
 
-export function connectGoogleCalendar(
-  returnView?: unknown,
-  loginHint = '',
-  selectAccount = false,
-  enableSync = false,
-) {
+export function connectGoogleCalendar(returnView?: unknown, loginHint = '', selectAccount = false) {
   rememberGoogleCalendarReturn(returnView);
 
   const target = new URL('/api/google-calendar/connect', window.location.origin);
   const normalizedHint = loginHint.trim();
   if (normalizedHint) target.searchParams.set('login_hint', normalizedHint);
   if (selectAccount) target.searchParams.set('select_account', '1');
-  if (enableSync) target.searchParams.set('enable_sync', '1');
   window.location.assign(`${target.pathname}${target.search}`);
 }
 
@@ -167,5 +199,5 @@ export async function disconnectGoogleCalendar() {
       cache: 'no-store',
     }),
   );
-  if (!response.ok) throw new Error('Google Calendar could not be disconnected.');
+  if (!response.ok) throw new Error('Google could not be disconnected.');
 }
