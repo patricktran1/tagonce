@@ -1,7 +1,17 @@
+type CalendarEventSuggestion = {
+  id?: string;
+  title?: string;
+  start?: string;
+  end?: string;
+  relevance?: string;
+  allDay?: boolean;
+  [key: string]: unknown;
+};
+
 type CalendarEventResponse = {
   configured?: boolean;
   connected?: boolean;
-  events?: unknown[];
+  events?: CalendarEventSuggestion[];
   error?: string;
   [key: string]: unknown;
 };
@@ -24,13 +34,54 @@ function isCalendarApiDisabled(message = '') {
     || normalized.includes('calendar-json.googleapis.com');
 }
 
+function validDateOnly(value = '') {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function addDays(value: string, days: number) {
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return date.toISOString().slice(0, 10);
+}
+
+function looksLikeLegacyAllDayEvent(event: CalendarEventSuggestion) {
+  return typeof event.start === 'string'
+    && typeof event.end === 'string'
+    && /^\d{4}-\d{2}-\d{2}T00:00:00\.000Z$/.test(event.start)
+    && /^\d{4}-\d{2}-\d{2}T23:59:59\.999Z$/.test(event.end);
+}
+
+function normalizeAllDayEvents(events: CalendarEventSuggestion[], localDate: string) {
+  return events.flatMap((event) => {
+    if (!looksLikeLegacyAllDayEvent(event)) return [event];
+
+    const startDate = event.start!.slice(0, 10);
+    const endExclusive = addDays(event.end!.slice(0, 10), 1);
+
+    // Google date-only values are calendar dates, not UTC instants. Only surface
+    // all-day events that actually include the user's current local date.
+    if (validDateOnly(localDate) && !(startDate <= localDate && localDate < endExclusive)) {
+      return [];
+    }
+
+    return [{
+      ...event,
+      start: startDate,
+      end: endExclusive,
+      allDay: true,
+      relevance: 'today',
+    }];
+  });
+}
+
 export default {
   async fetch(request: Request) {
     if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
 
+    const requestUrl = new URL(request.url);
     const upstreamUrl = new URL('/api/calendar-connect', request.url);
     upstreamUrl.searchParams.set('action', 'events');
-    const requestedEventName = new URL(request.url).searchParams.get('eventName');
+    const requestedEventName = requestUrl.searchParams.get('eventName');
     if (requestedEventName) upstreamUrl.searchParams.set('eventName', requestedEventName);
 
     const upstream = await fetch(upstreamUrl, {
@@ -52,9 +103,14 @@ export default {
       }, 503);
     }
 
+    const normalizedPayload = {
+      ...payload,
+      events: normalizeAllDayEvents(payload.events || [], requestUrl.searchParams.get('localDate') || ''),
+    };
+
     const headers = new Headers();
     const setCookie = upstream.headers.get('set-cookie');
     if (setCookie) headers.set('Set-Cookie', setCookie);
-    return json(payload, upstream.status, headers);
+    return json(normalizedPayload, upstream.status, headers);
   },
 };
