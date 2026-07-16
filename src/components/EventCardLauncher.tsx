@@ -1,15 +1,18 @@
 import {
+  ArrowRight,
   CalendarCheck,
   CalendarDays,
   ChevronDown,
   ExternalLink,
+  FileUp,
+  Link2,
   Loader2,
   MapPin,
   RefreshCw,
   Sparkles,
   Unplug,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   connectGoogleCalendar,
   disconnectGoogleCalendar,
@@ -120,6 +123,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
   const [showCalendarIntegration, setShowCalendarIntegration] = useState(() =>
     new URLSearchParams(window.location.search).has('calendar'),
   );
+  const calendarPanelRef = useRef<HTMLElement>(null);
 
   async function loadEvents() {
     setLoading(true);
@@ -193,6 +197,28 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     connectGoogleCalendar('event');
   }
 
+  function revealGoogleCalendar() {
+    if (state === 'disconnected') {
+      connectWithGoogle();
+      return;
+    }
+    setShowCalendarIntegration(true);
+    window.requestAnimationFrame(() => {
+      calendarPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  function openAppleInvitePicker() {
+    const input = document.querySelector<HTMLInputElement>('.event-import-panel input[type="file"]');
+    input?.click();
+  }
+
+  function focusEventLink() {
+    const input = document.querySelector<HTMLInputElement>('.event-link-input input');
+    input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.requestAnimationFrame(() => input?.focus());
+  }
+
   async function disconnect() {
     await disconnectGoogleCalendar();
     setState('disconnected');
@@ -224,23 +250,90 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     onOpenCards();
   }
 
+  const googleStatus = state === 'connected'
+    ? 'Connected'
+    : state === 'checking'
+      ? 'Checking'
+      : state === 'connecting'
+        ? 'Connecting'
+        : state === 'unconfigured'
+          ? 'Unavailable'
+          : 'Not connected';
+  const googleAction = state === 'connected'
+    ? 'View nearby events'
+    : state === 'checking'
+      ? 'Checking connection'
+      : state === 'connecting'
+        ? 'Opening Google'
+        : state === 'unconfigured'
+          ? 'Use another source'
+          : 'Connect Google';
+
   return (
     <div className="page-stack live-event-page">
       <section className="live-event-hero event-launcher-hero">
         <div>
-          <span className="hero-kicker">Event card launcher</span>
-          <h2>Turn any event into the right QR card.</h2>
+          <span className="hero-kicker">Events & Calendar</span>
+          <h2>Choose where the event comes from.</h2>
           <p>
-            Paste a Luma or public event link, upload an .ics invitation, connect Google Calendar, or enter
-            the details manually. Review everything before the Event QR is created.
+            Use Google Calendar, import an Apple Calendar invitation, or paste a Luma or public event link.
+            Every route ends in the same editable Event QR.
           </p>
         </div>
         <span className="live-event-orbit"><Sparkles size={32} /></span>
       </section>
 
-      <EventImportPanel profile={profile} onChange={onChange} onOpenCards={onOpenCards} />
+      <section className="event-source-hub" aria-labelledby="event-source-heading">
+        <div className="event-source-heading">
+          <span className="step-badge">1</span>
+          <div>
+            <h3 id="event-source-heading">Link or import your calendar</h3>
+            <p>Pick the fastest source for this event. You can review every detail before the QR is created.</p>
+          </div>
+        </div>
 
-      <section className={`panel calendar-integration-panel${showCalendarIntegration ? ' open' : ''}`}>
+        <div className="event-source-grid">
+          <button
+            className={`event-source-card google-source state-${state}`}
+            type="button"
+            disabled={state === 'checking' || state === 'connecting'}
+            onClick={revealGoogleCalendar}
+          >
+            <span className="event-source-icon google-source-icon"><GoogleMark /></span>
+            <span className="event-source-copy">
+              <small>GOOGLE CALENDAR</small>
+              <strong>{state === 'connected' ? 'Calendar linked' : 'Link Google Calendar'}</strong>
+              <p>Automatically find what is happening now or starting soon with read-only access.</p>
+            </span>
+            <span className={`event-source-status state-${state}`}>{googleStatus}</span>
+            <span className="event-source-action">{googleAction} <ArrowRight size={14} /></span>
+          </button>
+
+          <button className="event-source-card apple-source" type="button" onClick={openAppleInvitePicker}>
+            <span className="event-source-icon apple-source-icon"><FileUp size={23} /></span>
+            <span className="event-source-copy">
+              <small>APPLE CALENDAR</small>
+              <strong>Import an invitation</strong>
+              <p>Choose an .ics file from Mail, Files, Apple Calendar, Outlook, or another calendar app.</p>
+            </span>
+            <span className="event-source-status">On-device</span>
+            <span className="event-source-action">Choose .ics file <ArrowRight size={14} /></span>
+          </button>
+
+          <button className="event-source-card luma-source" type="button" onClick={focusEventLink}>
+            <span className="event-source-icon luma-source-icon"><Link2 size={23} /></span>
+            <span className="event-source-copy">
+              <small>LUMA / EVENT LINK</small>
+              <strong>Paste an event page</strong>
+              <p>Load public event details from a Luma page or another structured event website.</p>
+            </span>
+            <span className="event-source-status future-status">API later</span>
+            <span className="event-source-action">Paste event link <ArrowRight size={14} /></span>
+          </button>
+        </div>
+      </section>
+
+      <section ref={calendarPanelRef} className={`panel calendar-integration-panel${showCalendarIntegration ? ' open' : ''}`}>
         <button
           className="calendar-beta-toggle calendar-integration-toggle"
           type="button"
@@ -248,8 +341,8 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
           aria-expanded={showCalendarIntegration}
         >
           <span className="calendar-detection-icon"><CalendarDays size={20} /></span>
-          <span><strong>Google Calendar</strong><small>Optional read-only sync for nearby events</small></span>
-          <span className={`calendar-integration-pill state-${state}`}>{state === 'connected' ? 'CONNECTED' : 'OPTIONAL'}</span>
+          <span><strong>Google Calendar events</strong><small>Nearby events from the linked Google account</small></span>
+          <span className={`calendar-integration-pill state-${state}`}>{state === 'connected' ? 'CONNECTED' : 'GOOGLE'}</span>
           <ChevronDown size={18} />
         </button>
 
@@ -264,7 +357,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
             {state === 'unconfigured' && !loading && (
               <div className="live-event-connect muted-calendar-state">
                 <span className="calendar-detection-icon"><CalendarDays size={22} /></span>
-                <div><h3>Google Calendar is temporarily unavailable</h3><p>Link, invite-file and manual event creation still work normally.</p></div>
+                <div><h3>Google Calendar is temporarily unavailable</h3><p>Apple invite, Luma link, and manual event creation still work normally.</p></div>
               </div>
             )}
 
@@ -291,7 +384,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
                   <span><CalendarCheck size={17} /><strong>Calendar connected</strong></span>
                   <button className="button secondary small-button" disabled={loading} onClick={loadEvents}><RefreshCw className={loading ? 'spin' : ''} size={15} /> Refresh</button>
                 </div>
-                {events.length === 0 && <div className="live-event-empty"><CalendarDays size={24} /><strong>No nearby event found</strong><span>Upload an invite or use the link/manual launcher above, or create a timed Calendar event and refresh.</span></div>}
+                {events.length === 0 && <div className="live-event-empty"><CalendarDays size={24} /><strong>No nearby event found</strong><span>Import an Apple invite, paste a Luma link, type the event manually, or create a timed Google event and refresh.</span></div>}
                 {events.length > 0 && (
                   <div className="live-event-list">
                     {events.map((event) => (
@@ -318,6 +411,8 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
           </div>
         )}
       </section>
+
+      <EventImportPanel profile={profile} onChange={onChange} onOpenCards={onOpenCards} />
 
       <section className="live-event-explainer">
         <strong>What happens after you create the event?</strong>
