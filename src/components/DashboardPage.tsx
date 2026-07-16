@@ -17,6 +17,7 @@ import { ProfileAvatar } from './ProfileAvatar';
 interface DashboardPageProps {
   profile: MyProfile;
   googleIdentity: GoogleAccountIdentity | null;
+  calendarConnected: boolean;
   campaigns: Campaign[];
   entities: MentionEntity[];
   onConnectGoogle: () => void;
@@ -30,6 +31,7 @@ interface DashboardPageProps {
 export function DashboardPage({
   profile,
   googleIdentity,
+  calendarConnected,
   campaigns,
   entities,
   onConnectGoogle,
@@ -39,44 +41,40 @@ export function DashboardPage({
   onOpenContacts,
   onOpenBeta,
 }: DashboardPageProps) {
-  const connected = Boolean(googleIdentity?.email);
+  const profileReady = Boolean(googleIdentity?.email);
   const displayName = profile.displayName || googleIdentity?.displayName || '';
   const avatar = profile.avatarUrl || googleIdentity?.picture;
 
   return (
     <div className="page-stack qr-home-page">
-      <section className={`hero-panel qr-home-hero${connected ? ' connected' : ''}`}>
+      <section className={`hero-panel qr-home-hero${profileReady ? ' connected' : ''}`}>
         <div className="qr-home-hero-copy">
           <span className="hero-kicker">Event contact exchange</span>
-          <h2>{connected ? `Ready when you are, ${displayName.split(/\s+/)[0] || 'there'}.` : 'Meet someone. Exchange the whole moment.'}</h2>
-          <p>
-            Create a QR for an event, share the contact details you choose, and remember who you met, where, and why it mattered.
-          </p>
+          <h2>{profileReady ? `Ready when you are, ${displayName.split(/\s+/)[0] || 'there'}.` : 'Meet someone. Exchange the whole moment.'}</h2>
+          <p>Create a QR for an event, share the contact details you choose, and remember who you met, where, and why it mattered.</p>
           <div className="qr-home-hero-actions">
-            {connected ? (
+            {profileReady ? (
               <>
                 <button className="button primary large-button" onClick={onOpenEvents}><CalendarPlus size={18} /> Create Event QR</button>
                 <button className="button secondary large-button" onClick={onOpenCards}><QrCode size={18} /> Show my QR</button>
               </>
             ) : (
-              <button className="button primary google-home-button" onClick={onConnectGoogle}>
-                <LogIn size={18} /> Continue with Google
-              </button>
+              <button className="button primary google-home-button" onClick={onConnectGoogle}><LogIn size={18} /> Continue with Google</button>
             )}
           </div>
-          {!connected && <small className="google-home-note">One Google step creates your profile from your verified name, photo and email, and connects read-only Calendar.</small>}
+          {!profileReady && <small className="google-home-note">One Google step creates your profile from your verified name, photo and email, and connects read-only Calendar.</small>}
         </div>
 
         <div className="qr-home-profile-card">
           <ProfileAvatar name={displayName || 'TagOnce user'} src={avatar} className="qr-home-avatar" />
           <span>
-            <small>{connected ? 'GOOGLE PROFILE READY' : 'YOUR PROFILE'}</small>
+            <small>{profileReady ? 'GOOGLE PROFILE READY' : 'YOUR PROFILE'}</small>
             <strong>{displayName || 'Created after Google sign-in'}</strong>
             <p>{profile.email || googleIdentity?.email || 'Name, photo and email auto-fill'}</p>
           </span>
-          <span className={`qr-home-status${connected ? ' connected' : ''}`}>
-            {connected ? <CalendarCheck size={14} /> : <Sparkles size={14} />}
-            {connected ? 'Calendar connected' : 'One-step setup'}
+          <span className={`qr-home-status${calendarConnected ? ' connected' : ''}`}>
+            {calendarConnected ? <CalendarCheck size={14} /> : <Sparkles size={14} />}
+            {calendarConnected ? 'Calendar connected' : profileReady ? 'Profile ready' : 'One-step setup'}
           </span>
         </div>
       </section>
@@ -108,15 +106,15 @@ export function DashboardPage({
         </button>
       </section>
 
-      <section className={`panel calendar-front-door${connected ? ' connected' : ''}`}>
-        <div className="calendar-front-door-icon">{connected ? <CalendarCheck size={24} /> : <CalendarPlus size={24} />}</div>
+      <section className={`panel calendar-front-door${calendarConnected ? ' connected' : ''}`}>
+        <div className="calendar-front-door-icon">{calendarConnected ? <CalendarCheck size={24} /> : <CalendarPlus size={24} />}</div>
         <div>
           <span className="eyebrow">Google Calendar</span>
-          <h3>{connected ? 'Calendar is connected and ready' : 'Connect Calendar to find the event automatically'}</h3>
-          <p>{connected ? 'TagOnce can suggest what is happening now or starting soon, using read-only access.' : 'The same Google setup creates your personal profile and gives TagOnce read-only event access.'}</p>
+          <h3>{calendarConnected ? 'Calendar is connected and ready' : 'Connect Google to find the event automatically'}</h3>
+          <p>{calendarConnected ? 'TagOnce can suggest what is happening now or starting soon, using read-only access.' : 'One Google setup creates your personal profile and gives TagOnce read-only event access.'}</p>
         </div>
-        <button className={`button ${connected ? 'secondary' : 'primary'}`} onClick={connected ? onOpenEvents : onConnectGoogle}>
-          {connected ? 'View events' : 'Continue with Google'} <ArrowRight size={15} />
+        <button className={`button ${calendarConnected ? 'secondary' : 'primary'}`} onClick={calendarConnected ? onOpenEvents : onConnectGoogle}>
+          {calendarConnected ? 'View events' : 'Continue with Google'} <ArrowRight size={15} />
         </button>
       </section>
 
