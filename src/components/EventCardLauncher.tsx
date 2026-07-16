@@ -276,7 +276,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
           <span className="hero-kicker">Events & Calendar</span>
           <h2>Choose where the event comes from.</h2>
           <p>
-            Use Google Calendar, import an Apple Calendar invitation, or paste a Luma or public event link.
+            Use Google Calendar, import an Apple Calendar invitation, or paste any public event page.
             Every route ends in the same editable Event QR.
           </p>
         </div>
@@ -287,8 +287,8 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
         <div className="event-source-heading">
           <span className="step-badge">1</span>
           <div>
-            <h3 id="event-source-heading">Link or import your calendar</h3>
-            <p>Pick the fastest source for this event. You can review every detail before the QR is created.</p>
+            <h3 id="event-source-heading">Choose an event source</h3>
+            <p>Pick the fastest route. You can review and correct every detail before creating the QR.</p>
           </div>
         </div>
 
@@ -323,11 +323,10 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
           <button className="event-source-card luma-source" type="button" onClick={focusEventLink}>
             <span className="event-source-icon luma-source-icon"><Link2 size={23} /></span>
             <span className="event-source-copy">
-              <small>LUMA / EVENT LINK</small>
-              <strong>Paste an event page</strong>
-              <p>Load public event details from a Luma page or another structured event website.</p>
+              <small>EVENT LINK</small>
+              <strong>Paste any event page</strong>
+              <p>Import public details from Luma, Eventbrite, Meetup, Yelp, or another event website.</p>
             </span>
-            <span className="event-source-status future-status">API later</span>
             <span className="event-source-action">Paste event link <ArrowRight size={14} /></span>
           </button>
         </div>
@@ -357,7 +356,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
             {state === 'unconfigured' && !loading && (
               <div className="live-event-connect muted-calendar-state">
                 <span className="calendar-detection-icon"><CalendarDays size={22} /></span>
-                <div><h3>Google Calendar is temporarily unavailable</h3><p>Apple invite, Luma link, and manual event creation still work normally.</p></div>
+                <div><h3>Google Calendar is temporarily unavailable</h3><p>Apple invitations, public event links, and manual event creation still work normally.</p></div>
               </div>
             )}
 
@@ -384,7 +383,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
                   <span><CalendarCheck size={17} /><strong>Calendar connected</strong></span>
                   <button className="button secondary small-button" disabled={loading} onClick={loadEvents}><RefreshCw className={loading ? 'spin' : ''} size={15} /> Refresh</button>
                 </div>
-                {events.length === 0 && <div className="live-event-empty"><CalendarDays size={24} /><strong>No nearby event found</strong><span>Import an Apple invite, paste a Luma link, type the event manually, or create a timed Google event and refresh.</span></div>}
+                {events.length === 0 && <div className="live-event-empty"><CalendarDays size={24} /><strong>No nearby event found</strong><span>Import an Apple invitation, paste a public event link, type the event manually, or create a timed Google event and refresh.</span></div>}
                 {events.length > 0 && (
                   <div className="live-event-list">
                     {events.map((event) => (
