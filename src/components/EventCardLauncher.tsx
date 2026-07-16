@@ -15,7 +15,6 @@ import {
   disconnectGoogleCalendar,
   getCalendarEventSuggestions,
   getCalendarStatus,
-  getRememberedGoogleCalendarAccount,
   type CalendarConnectionState,
   type CalendarEventSuggestion,
 } from '../lib/calendarService';
@@ -37,17 +36,17 @@ const relevanceLabels: Record<CalendarEventSuggestion['relevance'], string> = {
 
 const oauthResultMessages: Record<string, string> = {
   cancelled: 'Google connection was cancelled.',
-  invalid_state: 'Google returned to TagOnce, but the secure authorization state was invalid or expired. Start the connection again.',
-  authorization_incomplete: 'Google returned without a complete authorization code. Start the connection again.',
-  client_credentials: 'The Google client secret in Vercel does not match the OAuth client ID.',
-  redirect_mismatch: 'Google rejected the callback address. Confirm the OAuth client contains https://tagonce.vercel.app/api/google-calendar/callback.',
-  authorization_expired: 'The Google authorization code expired before it could be exchanged. Start the connection again.',
-  token_exchange: 'Google approved access, but TagOnce could not exchange the authorization code. Retry once.',
-  identity_token: 'Google approved access, but TagOnce could not verify the Google identity. Retry once.',
-  identity_email: 'Google did not return a verified email address for this account.',
-  session_error: 'Google approved access, but TagOnce could not create the encrypted Calendar session.',
+  invalid_state: 'The Google connection expired before it finished. Start it again.',
+  authorization_incomplete: 'Google did not finish the authorization. Start it again.',
+  client_credentials: 'Google Calendar is temporarily unavailable because the app connection needs attention.',
+  redirect_mismatch: 'Google Calendar is temporarily unavailable because the return address was rejected.',
+  authorization_expired: 'The Google authorization expired before it finished. Start it again.',
+  token_exchange: 'Google approved access, but the connection could not be completed. Retry once.',
+  identity_token: 'Google approved access, but the account could not be verified. Retry once.',
+  identity_email: 'Google did not return a verified account email.',
+  session_error: 'Google approved access, but the secure Calendar session could not be created.',
   google_error: 'Google returned an authorization error. Start the connection again.',
-  unconfigured: 'The TagOnce deployment is missing one or more Google Calendar environment variables.',
+  unconfigured: 'Google Calendar is temporarily unavailable.',
 };
 
 function GoogleMark() {
@@ -77,20 +76,14 @@ function localDateValue(value: string) {
   return `${year}-${month}-${day}`;
 }
 
-function validEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-}
-
 export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardLauncherProps) {
-  const initialRememberedAccount = getRememberedGoogleCalendarAccount();
   const [state, setState] = useState<CalendarConnectionState>('checking');
   const [events, setEvents] = useState<CalendarEventSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [rememberedGoogleEmail, setRememberedGoogleEmail] = useState(initialRememberedAccount);
-  const [googleEmail, setGoogleEmail] = useState(initialRememberedAccount);
-  const [showEmailFallback, setShowEmailFallback] = useState(false);
-  const [showCalendarBeta, setShowCalendarBeta] = useState(Boolean(initialRememberedAccount));
+  const [showCalendarIntegration, setShowCalendarIntegration] = useState(() =>
+    new URLSearchParams(window.location.search).has('calendar'),
+  );
 
   async function loadEvents() {
     setLoading(true);
@@ -109,7 +102,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
         return;
       }
       setState('connected');
-      setShowCalendarBeta(true);
+      setShowCalendarIntegration(true);
       setEvents(response.events || []);
     } catch (loadError) {
       setState('connected');
@@ -123,14 +116,9 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     let cancelled = false;
     async function initialize() {
       const oauthResult = new URLSearchParams(window.location.search).get('calendar') || '';
-      const verifiedAccount = getRememberedGoogleCalendarAccount();
-      if (validEmail(verifiedAccount)) {
-        setRememberedGoogleEmail(verifiedAccount);
-        setGoogleEmail(verifiedAccount);
-      }
       const callbackMessage = oauthResultMessages[oauthResult] || (
         oauthResult && oauthResult !== 'connected'
-          ? `Google returned an unexpected result: ${oauthResult}.`
+          ? 'Google returned an unexpected connection result. Retry once.'
           : ''
       );
 
@@ -139,20 +127,20 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
         if (cancelled) return;
         if (!status.configured) {
           setState('unconfigured');
-          setError(callbackMessage || '');
+          setError(callbackMessage);
           return;
         }
         if (!status.connected) {
           setState('disconnected');
           if (callbackMessage) {
-            setShowCalendarBeta(true);
+            setShowCalendarIntegration(true);
             setError(callbackMessage);
           }
           return;
         }
-        setShowCalendarBeta(true);
+        setShowCalendarIntegration(true);
         await loadEvents();
-      } catch (statusError) {
+      } catch {
         if (!cancelled) {
           setState('disconnected');
           if (callbackMessage) setError(callbackMessage);
@@ -164,27 +152,13 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
   }, []);
 
   function connectWithGoogle() {
-    if (!validEmail(rememberedGoogleEmail)) {
-      setShowEmailFallback(true);
-      setError('Enter the Google account you want to use, or keep using the link/manual launcher above.');
-      return;
-    }
     setState('connecting');
     setError('');
-    connectGoogleCalendar('event', rememberedGoogleEmail);
-  }
-
-  function connectWithEmail() {
-    setState('connecting');
-    setError('');
-    connectGoogleCalendar('event', googleEmail);
+    connectGoogleCalendar('event');
   }
 
   async function disconnect() {
     await disconnectGoogleCalendar();
-    const verifiedAccount = getRememberedGoogleCalendarAccount();
-    setRememberedGoogleEmail(verifiedAccount);
-    if (verifiedAccount) setGoogleEmail(verifiedAccount);
     setState('disconnected');
     setEvents([]);
     setError('');
@@ -219,8 +193,8 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
           <span className="hero-kicker">Event card launcher</span>
           <h2>Turn any event into the right QR card.</h2>
           <p>
-            Paste a Luma or public event link, review the extracted time and venue, then open an Event QR
-            without connecting another account. Manual entry always works.
+            Paste a Luma or public event link, upload an .ics invitation, connect Google Calendar, or enter
+            the details manually. Review everything before the Event QR is created.
           </p>
         </div>
         <span className="live-event-orbit"><Sparkles size={32} /></span>
@@ -228,21 +202,21 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
 
       <EventImportPanel profile={profile} onChange={onChange} onOpenCards={onOpenCards} />
 
-      <section className={`panel calendar-beta-panel${showCalendarBeta ? ' open' : ''}`}>
+      <section className={`panel calendar-integration-panel${showCalendarIntegration ? ' open' : ''}`}>
         <button
-          className="calendar-beta-toggle"
+          className="calendar-beta-toggle calendar-integration-toggle"
           type="button"
-          onClick={() => setShowCalendarBeta((current) => !current)}
-          aria-expanded={showCalendarBeta}
+          onClick={() => setShowCalendarIntegration((current) => !current)}
+          aria-expanded={showCalendarIntegration}
         >
           <span className="calendar-detection-icon"><CalendarDays size={20} /></span>
-          <span><strong>Google Calendar sync</strong><small>Optional beta convenience for nearby events</small></span>
-          <span className="beta-pill">BETA</span>
+          <span><strong>Google Calendar</strong><small>Optional read-only sync for nearby events</small></span>
+          <span className={`calendar-integration-pill state-${state}`}>{state === 'connected' ? 'CONNECTED' : 'OPTIONAL'}</span>
           <ChevronDown size={18} />
         </button>
 
-        {showCalendarBeta && (
-          <div className="calendar-beta-body">
+        {showCalendarIntegration && (
+          <div className="calendar-beta-body calendar-integration-body">
             {(state === 'checking' || state === 'connecting' || loading) && (
               <div className="live-event-loading"><Loader2 className="spin" size={19} />
                 {state === 'connecting' ? 'Taking you to Google…' : 'Checking your calendar…'}
@@ -252,34 +226,23 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
             {state === 'unconfigured' && !loading && (
               <div className="live-event-connect muted-calendar-state">
                 <span className="calendar-detection-icon"><CalendarDays size={22} /></span>
-                <div><h3>Calendar beta is unavailable</h3><p>The link and manual event launcher above still works normally.</p></div>
+                <div><h3>Google Calendar is temporarily unavailable</h3><p>Link, invite-file and manual event creation still work normally.</p></div>
               </div>
             )}
 
             {state === 'disconnected' && !loading && (
-              <div className="live-event-connect compact-google-connect">
+              <div className="live-event-connect compact-google-connect calendar-clean-connect">
                 <span className="calendar-detection-icon"><CalendarCheck size={22} /></span>
                 <div>
                   <h3>Connect Google Calendar</h3>
-                  <p>Optional read-only access to event titles, times and locations.</p>
-                  <div className="google-calendar-primary-connect">
-                    <button className="google-oauth-button" type="button" onClick={connectWithGoogle}>
-                      <GoogleMark /><span>Continue with Google</span>
-                    </button>
-                    {validEmail(rememberedGoogleEmail) && <span>Continue as {rememberedGoogleEmail}</span>}
-                  </div>
-                  <button className="text-button calendar-fallback-toggle" type="button" onClick={() => { setShowEmailFallback((current) => !current); setError(''); }}>
-                    {showEmailFallback ? 'Hide account field' : 'Use a different account'}
+                  <p>Approve read-only access to event titles, times and locations. TagOnce cannot edit your calendar.</p>
+                  <button className="google-oauth-button" type="button" onClick={connectWithGoogle}>
+                    <GoogleMark /><span>Continue with Google</span>
                   </button>
-                  {showEmailFallback && (
-                    <div className="calendar-account-connect calendar-email-fallback">
-                      <label htmlFor="calendar-google-email">Google account email</label>
-                      <div className="calendar-account-row">
-                        <input id="calendar-google-email" type="email" autoComplete="email" placeholder="you@gmail.com" value={googleEmail} onChange={(event) => setGoogleEmail(event.target.value)} />
-                        <button className="button primary" disabled={!validEmail(googleEmail)} onClick={connectWithEmail}><CalendarCheck size={17} /> Continue</button>
-                      </div>
-                    </div>
-                  )}
+                  <details className="calendar-safari-help">
+                    <summary>Google screen not continuing in Safari?</summary>
+                    <p>Safari can block the return between Google and TagOnce when cross-site traffic is restricted. Allow the Google-to-TagOnce handoff in Safari’s website privacy settings, then retry.</p>
+                  </details>
                 </div>
               </div>
             )}
@@ -290,7 +253,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
                   <span><CalendarCheck size={17} /><strong>Calendar connected</strong></span>
                   <button className="button secondary small-button" disabled={loading} onClick={loadEvents}><RefreshCw className={loading ? 'spin' : ''} size={15} /> Refresh</button>
                 </div>
-                {events.length === 0 && <div className="live-event-empty"><CalendarDays size={24} /><strong>No nearby event found</strong><span>Use the link or manual launcher above, or create a timed Calendar event and refresh.</span></div>}
+                {events.length === 0 && <div className="live-event-empty"><CalendarDays size={24} /><strong>No nearby event found</strong><span>Upload an invite or use the link/manual launcher above, or create a timed Calendar event and refresh.</span></div>}
                 {events.length > 0 && (
                   <div className="live-event-list">
                     {events.map((event) => (
@@ -320,7 +283,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
 
       <section className="live-event-explainer">
         <strong>What happens after you create the event?</strong>
-        <span>TagOnce opens My QR Cards in Event mode, adds the event context, and expires the temporary card after the event date.</span>
+        <span>TagOnce opens My QR Cards in Event mode, adds the event context, and expires the temporary card at the event end time.</span>
       </section>
     </div>
   );
