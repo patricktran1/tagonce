@@ -13,8 +13,36 @@ function base64ToBytes(value: string) {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
+function safeAvatarUrl(value?: string) {
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : '';
+  } catch {
+    return '';
+  }
+}
+
+function currentProfileAvatar() {
+  try {
+    const profile = JSON.parse(window.localStorage.getItem('tagonce.profile.v1') || '{}') as { avatarUrl?: string };
+    return safeAvatarUrl(profile.avatarUrl);
+  } catch {
+    return '';
+  }
+}
+
+function enrichedPayload(payload: ShareCardPayload): ShareCardPayload {
+  const avatarUrl = safeAvatarUrl(payload.profile.avatarUrl) || currentProfileAvatar();
+  if (!avatarUrl || payload.profile.avatarUrl === avatarUrl) return payload;
+  return {
+    ...payload,
+    profile: { ...payload.profile, avatarUrl },
+  };
+}
+
 export function encodeCardPayload(payload: ShareCardPayload) {
-  const bytes = new TextEncoder().encode(JSON.stringify(payload));
+  const bytes = new TextEncoder().encode(JSON.stringify(enrichedPayload(payload)));
   return bytesToBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
@@ -26,6 +54,7 @@ export function decodeCardPayload(encoded: string): ShareCardPayload {
   if (payload.version !== 1 || !payload.profile?.displayName || !payload.mode) {
     throw new Error('This is not a valid TagOnce card.');
   }
+  if (payload.profile.avatarUrl) payload.profile.avatarUrl = safeAvatarUrl(payload.profile.avatarUrl) || undefined;
   return payload;
 }
 
@@ -66,6 +95,7 @@ export function createVCard(payload: ShareCardPayload) {
   if (profile.phone) lines.push(`TEL;TYPE=CELL:${escapeVCard(profile.phone)}`);
   if (profile.website) lines.push(`URL:${escapeVCard(profile.website)}`);
   if (profile.whatsapp) lines.push(`X-WHATSAPP:${escapeVCard(profile.whatsapp)}`);
+  if (profile.avatarUrl) lines.push(`PHOTO;VALUE=URI:${escapeVCard(profile.avatarUrl)}`);
 
   Object.entries(socials).forEach(([platform, identity]) => {
     const profileUrl = identity?.profileUrl;
@@ -85,7 +115,7 @@ export function createVCard(payload: ShareCardPayload) {
 }
 
 export function downloadVCard(payload: ShareCardPayload) {
-  const blob = new Blob([createVCard(payload)], { type: 'text/vcard;charset=utf-8' });
+  const blob = new Blob([createVCard(enrichedPayload(payload))], { type: 'text/vcard;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   const safeName = payload.profile.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
