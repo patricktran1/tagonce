@@ -1,12 +1,15 @@
 import {
   BriefcaseBusiness,
+  CalendarDays,
   Check,
   ChevronDown,
+  Clock3,
   Copy,
   Download,
   ExternalLink,
   IdCard,
   Lock,
+  MapPin,
   QrCode,
   RefreshCw,
   ShieldCheck,
@@ -116,6 +119,32 @@ function socialDisplay(identity: SharedSocialIdentity) {
   }
 }
 
+function isoToLocalInput(value = '') {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 16);
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function localInputToIso(value = '') {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
+
+function eventTimeSummary(startValue?: string, endValue?: string) {
+  if (!startValue) return '';
+  const start = new Date(startValue);
+  if (Number.isNaN(start.getTime())) return '';
+  const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+  const end = endValue ? new Date(endValue) : null;
+  return end && !Number.isNaN(end.getTime())
+    ? `${day.format(start)} · ${time.format(start)}–${time.format(end)}`
+    : `${day.format(start)} · ${time.format(start)}`;
+}
+
 export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps) {
   const [mode, setMode] = useState<CardMode>('event');
   const [copied, setCopied] = useState(false);
@@ -125,6 +154,13 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
 
   function update<K extends keyof MyProfile>(key: K, value: MyProfile[K]) {
     onChange({ ...profile, [key]: value });
+  }
+
+  function updateEventTime(key: 'eventStartAt' | 'eventEndAt', value: string) {
+    const isoValue = localInputToIso(value);
+    const next: MyProfile = { ...profile, [key]: isoValue };
+    if (key === 'eventEndAt' && value) next.eventEndsAt = value.slice(0, 10);
+    onChange(next);
   }
 
   const connectionMap = useMemo(
@@ -224,12 +260,17 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
       if (!Number.isNaN(date.getTime())) expiresAt = date.toISOString();
     }
 
+    const sharesEvent = includes('eventName');
     return {
       version: 1,
       mode,
       createdAt: new Date().toISOString(),
       expiresAt,
-      eventName: includes('eventName') ? profile.eventName || undefined : undefined,
+      eventName: sharesEvent ? profile.eventName || undefined : undefined,
+      eventStartAt: sharesEvent ? profile.eventStartAt || undefined : undefined,
+      eventEndAt: sharesEvent ? profile.eventEndAt || undefined : undefined,
+      eventLocation: sharesEvent ? profile.eventLocation || undefined : undefined,
+      eventUrl: sharesEvent ? profile.eventUrl || undefined : undefined,
       profile: {
         displayName: profile.displayName || 'Your name',
         title: includes('title') ? profile.title || undefined : undefined,
@@ -251,6 +292,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
   const activeSocials = activeSocialEntries.length;
   const activeDetails = Object.values(payload.profile).filter(Boolean).length;
   const cardSubtitle = [payload.profile.title, payload.profile.company].filter(Boolean).join(' · ');
+  const eventTime = eventTimeSummary(payload.eventStartAt, payload.eventEndAt);
 
   async function copyShareLink() {
     await navigator.clipboard.writeText(shareUrl);
@@ -294,7 +336,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
             <input
               value={identity.profileUrl ?? ''}
               onChange={(event) => updateSocial(platform, 'profileUrl', event.target.value)}
-              placeholder={`https://…`}
+              placeholder="https://…"
             />
           </label>
         </div>
@@ -343,11 +385,17 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
               <label className="field"><span>WhatsApp</span><input value={profile.whatsapp} onChange={(event) => update('whatsapp', event.target.value)} placeholder="Number or wa.me link" /></label>
             </div>
             <div className="event-context-fields">
-              <div className="field-heading"><BriefcaseBusiness size={17} /><div><strong>Event context</strong><small>Select it on Event, Personal or Custom cards when relevant.</small></div></div>
+              <div className="field-heading"><BriefcaseBusiness size={17} /><div><strong>Event context</strong><small>Imported details remain editable and travel with the QR when event context is selected.</small></div></div>
               <div className="two-field-row">
                 <label className="field"><span>Event name</span><input value={profile.eventName} onChange={(event) => update('eventName', event.target.value)} placeholder="AGI Summit 2026" /></label>
                 <label className="field"><span>Expires after</span><input type="date" value={profile.eventEndsAt} onChange={(event) => update('eventEndsAt', event.target.value)} /></label>
               </div>
+              <div className="two-field-row">
+                <label className="field"><span>Starts</span><input type="datetime-local" value={isoToLocalInput(profile.eventStartAt)} onChange={(event) => updateEventTime('eventStartAt', event.target.value)} /></label>
+                <label className="field"><span>Ends</span><input type="datetime-local" value={isoToLocalInput(profile.eventEndAt)} onChange={(event) => updateEventTime('eventEndAt', event.target.value)} /></label>
+              </div>
+              <label className="field"><span>Venue or location</span><input value={profile.eventLocation || ''} onChange={(event) => update('eventLocation', event.target.value)} placeholder="Exploratorium, San Francisco" /></label>
+              <label className="field"><span>Event page</span><input value={profile.eventUrl || ''} onChange={(event) => update('eventUrl', event.target.value)} placeholder="https://lu.ma/..." /></label>
             </div>
           </div>
 
@@ -409,7 +457,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
                 onClick={() => toggleField('eventName')}
               >
                 <BriefcaseBusiness size={14} />
-                <span><strong>Event name + expiration</strong><small>{profile.eventName.trim() ? profile.eventName : 'Add an event first'}</small></span>
+                <span><strong>Event name, time, venue + expiration</strong><small>{profile.eventName.trim() ? profile.eventName : 'Add an event first'}</small></span>
                 {selectedFields.includes('eventName') && <Check size={14} />}
               </button>
             </div>
@@ -423,6 +471,14 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
             <span className="eyebrow">{payload.eventName || `${modeMeta[mode].label} card`}</span>
             <h3>{profile.displayName || 'Your name'}</h3>
             <p>{cardSubtitle || 'Only the fields you selected will be shared'}</p>
+
+            {payload.eventName && (eventTime || payload.eventLocation || payload.eventUrl) && (
+              <div className="share-card-event-context">
+                {eventTime && <span><CalendarDays size={14} /> {eventTime}</span>}
+                {payload.eventLocation && <span><MapPin size={14} /> {payload.eventLocation}</span>}
+                {payload.eventUrl && <a href={payload.eventUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Event page</a>}
+              </div>
+            )}
 
             <div className="qr-stage">
               <QRCodeSVG value={shareUrl} size={228} level="L" marginSize={2} title={`${mode} TagOnce card for ${profile.displayName}`} />
@@ -454,7 +510,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
             <button className="button secondary" onClick={() => downloadVCard(payload)}><Download size={17} /> Download vCard</button>
           </div>
           <p className="card-handoff-note">
-            The QR page and vCard contain the same selected details. Recipients can save the contact or jump directly to each shared profile.
+            The vCard saves contact details. The QR also carries the selected event context and clickable social profiles.
           </p>
         </section>
       </div>
