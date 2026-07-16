@@ -28,7 +28,7 @@ interface SidebarProps {
 
 const items = [
   { key: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'event' as const, label: 'Live event', icon: CalendarDays },
+  { key: 'event' as const, label: 'Event launcher', icon: CalendarDays },
   { key: 'mycard' as const, label: 'My QR cards', icon: IdCard },
   { key: 'scan' as const, label: 'Receive card', icon: ScanLine },
   { key: 'address' as const, label: 'Address book', icon: ContactRound },
@@ -66,7 +66,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
       <div className="sidebar-footer">
         <div className="beta-note">
           <strong>Context cards live</strong>
-          <span>Calendar-powered event cards, QR exchange, vCards, memories and tag-ready contacts.</span>
+          <span>Event-link importing, QR exchange, vCards, memories and tag-ready contacts.</span>
         </div>
       </div>
     </aside>
