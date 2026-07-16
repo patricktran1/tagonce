@@ -1,0 +1,37 @@
+/* Release 0.14: recipient-side event context */
+.received-event-context {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+  padding: 14px;
+  border: 1px solid #e2d9e7;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fbf8fd, #f7f2fb);
+}
+
+.received-event-context > span,
+.received-event-context > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #5a4d61;
+  font-size: 12px;
+  line-height: 1.45;
+  text-decoration: none;
+}
+
+.received-event-context-title {
+  color: #2f2536 !important;
+  font-size: 13px !important;
+}
+
+.received-event-context > a {
+  width: fit-content;
+  color: #6746c8;
+  font-weight: 750;
+}
+
+.received-event-context > a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
