@@ -86,7 +86,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [rememberedGoogleEmail, setRememberedGoogleEmail] = useState(initialRememberedAccount);
-  const [googleEmail, setGoogleEmail] = useState(initialRememberedAccount || profile.email || '');
+  const [googleEmail, setGoogleEmail] = useState(initialRememberedAccount);
   const [showEmailFallback, setShowEmailFallback] = useState(false);
 
   async function loadEvents() {
@@ -209,7 +209,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     <div className="page-stack live-event-page">
       <section className="live-event-hero">
         <div>
-          <span className="hero-kicker">Calendar-powered identity</span>
+          <span className="hero-kicker">Calendar sync · beta</span>
           <h2>Walk into an event with the right card already loaded.</h2>
           <p>
             TagOnce finds the event happening around you, then turns it into an Event QR preset with
@@ -222,7 +222,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
       <section className="panel live-event-panel">
         <div className="panel-heading live-event-panel-heading">
           <div>
-            <span className="step-badge">LIVE</span>
+            <span className="step-badge">BETA</span>
             <div><h3>Nearby calendar events</h3><p>Current, recently ended and soon-starting events are ranked first.</p></div>
           </div>
           {state === 'connected' && (
@@ -262,7 +262,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
                 {validEmail(rememberedGoogleEmail) ? (
                   <span>Continue as {rememberedGoogleEmail}</span>
                 ) : (
-                  <span>First connection: confirm the Google account once below.</span>
+                  <span>First connection: choose the Google account below.</span>
                 )}
                 <small>TagOnce can read your Calendar. It cannot edit it.</small>
               </div>
