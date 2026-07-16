@@ -82,6 +82,7 @@ export default {
     const origin = requestUrl.origin;
     const redirectUri = `${origin}/api/google-calendar/callback`;
     const loginHint = validLoginHint(requestUrl.searchParams.get('login_hint'));
+    const selectAccount = requestUrl.searchParams.get('select_account') === '1';
     const state = await signedState(secret);
     const authorizationUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     const authorizationParams: Record<string, string> = {
@@ -94,6 +95,7 @@ export default {
       state,
     };
     if (loginHint) authorizationParams.login_hint = loginHint;
+    if (selectAccount) authorizationParams.prompt = 'select_account';
     authorizationUrl.search = new URLSearchParams(authorizationParams).toString();
 
     return new Response(null, {
