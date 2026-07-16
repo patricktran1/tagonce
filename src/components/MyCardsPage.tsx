@@ -43,8 +43,38 @@ interface MyCardsPageProps {
   onChange: (profile: MyProfile) => void;
 }
 
+type EventPresetKey = 'hackathon' | 'conference' | 'social' | 'dating' | 'custom';
+
+const eventPresetSelections: Record<Exclude<EventPresetKey, 'custom'>, ShareFieldKey[]> = {
+  hackathon: ['title', 'company', 'email', 'website', 'eventName', 'social:linkedin', 'social:github'],
+  conference: ['title', 'company', 'email', 'website', 'eventName', 'social:linkedin', 'social:github', 'social:x'],
+  social: ['email', 'phone', 'whatsapp', 'eventName', 'social:instagram', 'social:linkedin'],
+  dating: ['phone', 'whatsapp', 'eventName', 'social:instagram', 'social:linkedin'],
+};
+
+const eventPresetOptions: Array<{
+  key: EventPresetKey;
+  label: string;
+  description: string;
+}> = [
+  { key: 'hackathon', label: 'Hackathon', description: 'LinkedIn + GitHub with your work identity and event context.' },
+  { key: 'conference', label: 'Conference', description: 'LinkedIn, GitHub and X with professional contact details.' },
+  { key: 'social', label: 'Social', description: 'Instagram and LinkedIn with easier direct follow-up options.' },
+  { key: 'dating', label: 'Dating', description: 'A consent-controlled mix of Instagram, WhatsApp or phone, and LinkedIn.' },
+  { key: 'custom', label: 'Custom', description: 'Keep the current mix and choose every field yourself below.' },
+];
+
+const legacyEventSelection: ShareFieldKey[] = [
+  'title',
+  'company',
+  'email',
+  'website',
+  'eventName',
+  'social:linkedin',
+];
+
 const defaultSelections: Record<CardMode, ShareFieldKey[]> = {
-  event: ['title', 'company', 'email', 'website', 'eventName', 'social:linkedin'],
+  event: eventPresetSelections.hackathon,
   personal: [
     'title',
     'company',
@@ -76,8 +106,8 @@ const detailOptions: Array<{
 const modeMeta: Record<CardMode, { label: string; access: string; description: string }> = {
   event: {
     label: 'Event',
-    access: 'Professional access',
-    description: 'A professional preset you can customize for today’s room.',
+    access: 'Contextual access',
+    description: 'Start with a room-specific preset, then customize any field.',
   },
   personal: {
     label: 'Personal',
@@ -90,6 +120,20 @@ const modeMeta: Record<CardMode, { label: string; access: string; description: s
     description: 'Select any combination for a one-off moment or relationship.',
   },
 };
+
+function sameSelection(left: ShareFieldKey[], right: ShareFieldKey[]) {
+  if (left.length !== right.length) return false;
+  const rightSet = new Set(right);
+  return left.every((field) => rightSet.has(field));
+}
+
+function detectEventPreset(fields: ShareFieldKey[]): EventPresetKey {
+  const match = (Object.entries(eventPresetSelections) as Array<[
+    Exclude<EventPresetKey, 'custom'>,
+    ShareFieldKey[],
+  ]>).find(([, selection]) => sameSelection(fields, selection));
+  return match?.[0] || 'custom';
+}
 
 function profileFieldValue(profile: MyProfile, key: ShareFieldKey) {
   switch (key) {
@@ -160,6 +204,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
     optionalSocialPlatforms.some((platform) => Boolean(profile.socialProfiles?.[platform]?.handle || profile.socialProfiles?.[platform]?.profileUrl)),
   );
   const [mobileEditorOpen, setMobileEditorOpen] = useState(false);
+  const [forceCustomEventPreset, setForceCustomEventPreset] = useState(false);
 
   function update<K extends keyof MyProfile>(key: K, value: MyProfile[K]) {
     onChange({ ...profile, [key]: value });
@@ -177,10 +222,17 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
     [connections],
   );
 
-  const selectedFields = useMemo(
-    () => profile.cardSelections?.[mode] ?? defaultSelections[mode],
-    [mode, profile.cardSelections],
-  );
+  const selectedFields = useMemo(() => {
+    const saved = profile.cardSelections?.[mode];
+    if (mode === 'event' && saved && sameSelection(saved, legacyEventSelection)) {
+      return eventPresetSelections.hackathon;
+    }
+    return saved ?? defaultSelections[mode];
+  }, [mode, profile.cardSelections]);
+
+  const activeEventPreset = forceCustomEventPreset
+    ? 'custom'
+    : detectEventPreset(selectedFields);
 
   function socialIdentity(platform: SocialPlatform): SharedSocialIdentity {
     const saved = profile.socialProfiles?.[platform];
@@ -196,11 +248,21 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
     });
   }
 
+  function applyEventPreset(preset: EventPresetKey) {
+    if (preset === 'custom') {
+      setForceCustomEventPreset(true);
+      return;
+    }
+    setForceCustomEventPreset(false);
+    setSelectedFields([...eventPresetSelections[preset]]);
+  }
+
   function toggleField(key: ShareFieldKey) {
     const available = key.startsWith('social:')
       ? Boolean(socialIdentity(key.slice('social:'.length) as SocialPlatform).handle || socialIdentity(key.slice('social:'.length) as SocialPlatform).profileUrl)
       : Boolean(profileFieldValue(profile, key).trim());
     if (!available) return;
+    if (mode === 'event') setForceCustomEventPreset(true);
     setSelectedFields(
       selectedFields.includes(key)
         ? selectedFields.filter((field) => field !== key)
@@ -215,6 +277,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
     const nextSelections = wasEmpty && value.trim() && !selectedFields.includes(socialKey)
       ? [...selectedFields, socialKey]
       : selectedFields;
+    if (mode === 'event' && nextSelections !== selectedFields) setForceCustomEventPreset(true);
 
     onChange({
       ...profile,
@@ -227,6 +290,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
   }
 
   function resetPreset() {
+    if (mode === 'event') setForceCustomEventPreset(false);
     setSelectedFields(defaultSelections[mode]);
   }
 
@@ -321,7 +385,11 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
         <div className="social-profile-inputs">
           <label className="field compact-field">
             <span>Handle</span>
-            <input value={identity.handle ?? ''} onChange={(event) => updateSocial(platform, 'handle', event.target.value)} placeholder={platform === 'linkedin' ? 'Vanity name' : '@username'} />
+            <input
+              value={identity.handle ?? ''}
+              onChange={(event) => updateSocial(platform, 'handle', event.target.value)}
+              placeholder={platform === 'linkedin' ? 'Vanity name' : platform === 'github' ? 'username' : '@username'}
+            />
           </label>
           <label className="field compact-field">
             <span>Profile link</span>
@@ -384,7 +452,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
                   <label className="field"><span>Ends</span><input type="datetime-local" value={isoToLocalInput(profile.eventEndAt)} onChange={(event) => updateEventTime('eventEndAt', event.target.value)} /></label>
                 </div>
                 <label className="field"><span>Venue or location</span><input value={profile.eventLocation || ''} onChange={(event) => update('eventLocation', event.target.value)} placeholder="Exploratorium, San Francisco" /></label>
-                <label className="field"><span>Event page</span><input value={profile.eventUrl || ''} onChange={(event) => update('eventUrl', event.target.value)} placeholder="https://lu.ma/..." /></label>
+                <label className="field"><span>Event page</span><input value={profile.eventUrl || ''} onChange={(event) => update('eventUrl', event.target.value)} placeholder="https://event-page.example" /></label>
               </div>
             </div>
 
@@ -392,7 +460,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
               <div className="inline-social-editor-heading"><div><span className="eyebrow">Social profiles</span><h3>Add, edit and choose what this card shares</h3><p>Handles are enough for most networks; a full link is safest for LinkedIn and Facebook.</p></div></div>
               <div className="social-profile-editor-list">{coreSocialPlatforms.map(socialEditor)}</div>
               <button className={`more-networks-button${showMoreNetworks ? ' open' : ''}`} type="button" onClick={() => setShowMoreNetworks((current) => !current)}>
-                <span><strong>{showMoreNetworks ? 'Hide optional networks' : 'Show more networks'}</strong><small>Threads, TikTok, YouTube, Snapchat, Pinterest and GitHub</small></span>
+                <span><strong>{showMoreNetworks ? 'Hide optional networks' : 'Show more networks'}</strong><small>Threads, TikTok, YouTube, Snapchat and Pinterest</small></span>
                 <ChevronDown size={17} />
               </button>
               {showMoreNetworks && <div className="social-profile-editor-list optional-social-list">{optionalSocialPlatforms.map(socialEditor)}</div>}
@@ -406,6 +474,29 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
             <button className={mode === 'personal' ? 'active' : ''} type="button" onClick={() => setMode('personal')}><UserRound size={16} /> Personal</button>
             <button className={mode === 'custom' ? 'active' : ''} type="button" onClick={() => setMode('custom')}><SlidersHorizontal size={16} /> Custom</button>
           </div>
+
+          {mode === 'event' && (
+            <div className="event-card-presets" aria-label="Event card presets">
+              <div className="event-card-presets-heading">
+                <span><strong>Choose the room</strong><small>Start with a recommended sharing mix</small></span>
+                <span className="event-preset-current">{eventPresetOptions.find((preset) => preset.key === activeEventPreset)?.label}</span>
+              </div>
+              <div className="event-card-preset-grid">
+                {eventPresetOptions.map((preset) => (
+                  <button
+                    className={activeEventPreset === preset.key ? 'active' : ''}
+                    type="button"
+                    key={preset.key}
+                    onClick={() => applyEventPreset(preset.key)}
+                    aria-pressed={activeEventPreset === preset.key}
+                  >
+                    <strong>{preset.label}</strong>
+                  </button>
+                ))}
+              </div>
+              <p>{eventPresetOptions.find((preset) => preset.key === activeEventPreset)?.description}</p>
+            </div>
+          )}
 
           <div className={`share-card share-card-${mode} pocket-share-card`}>
             <div className="share-card-header">
