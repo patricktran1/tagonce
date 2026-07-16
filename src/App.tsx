@@ -11,6 +11,7 @@ import './release09.css';
 import './release10.css';
 import './release11.css';
 import './release12.css';
+import './release13.css';
 import { AddressBookPage } from './components/AddressBookPage';
 import { CampaignsPage } from './components/CampaignsPage';
 import { CampaignComposer } from './components/CampaignComposer';
@@ -57,6 +58,11 @@ const defaultProfile: MyProfile = {
   website: 'https://aionehr.com',
   eventName: '',
   eventEndsAt: new Date().toISOString().slice(0, 10),
+  eventStartAt: '',
+  eventEndAt: '',
+  eventLocation: '',
+  eventUrl: '',
+  eventDescription: '',
   cardSelections: {
     event: ['title', 'company', 'email', 'website', 'eventName', 'social:linkedin'],
     personal: [
@@ -76,7 +82,7 @@ const defaultProfile: MyProfile = {
 
 const pageMeta: Record<PageKey, { title: string; eyebrow: string }> = {
   dashboard: { title: 'Dashboard', eyebrow: 'Identity workspace overview' },
-  event: { title: 'Live event', eyebrow: 'Calendar-powered event cards' },
+  event: { title: 'Event launcher', eyebrow: 'Luma links, manual entry and calendar beta' },
   mycard: { title: 'My QR cards', eyebrow: 'Contextual identity exchange' },
   scan: { title: 'Receive card', eyebrow: 'Save the person and the moment' },
   address: { title: 'Address book', eyebrow: 'Social contacts and memories' },
