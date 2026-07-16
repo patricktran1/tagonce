@@ -32,7 +32,7 @@ export async function loadCloudWorkspace() {
     cache: 'no-store',
   }));
 
-  if ([401, 403].includes(response.status)) return payload;
+  if ([401, 403, 502].includes(response.status)) return payload;
   if (!response.ok) throw new Error(payload.error || 'TagOnce cloud sync could not be checked.');
   return payload;
 }
@@ -46,7 +46,7 @@ export async function saveCloudWorkspace(workspace: CloudWorkspace) {
     body: JSON.stringify(workspace),
   }));
 
-  if ([401, 403].includes(response.status)) return payload;
+  if ([401, 403, 502].includes(response.status)) return payload;
   if (!response.ok) throw new Error(payload.error || 'TagOnce cloud sync could not save this workspace.');
   return payload;
 }
