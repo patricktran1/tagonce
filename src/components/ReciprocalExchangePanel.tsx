@@ -92,19 +92,6 @@ function saveReceipt(payload: ShareCardPayload, receipt: ExchangeReceipt) {
   }
 }
 
-function fieldValue(profile: MyProfile, key: ShareFieldKey) {
-  switch (key) {
-    case 'title': return profile.title;
-    case 'company': return profile.company;
-    case 'email': return profile.email;
-    case 'phone': return profile.phone;
-    case 'whatsapp': return profile.whatsapp;
-    case 'website': return profile.website;
-    case 'eventName': return profile.eventName;
-    default: return '';
-  }
-}
-
 function eventTimeSummary(payload: ShareCardPayload) {
   if (!payload.eventStartAt) return '';
   const start = new Date(payload.eventStartAt);
@@ -130,12 +117,18 @@ function socialDisplay(identity: SharedSocialIdentity) {
 
 export function ReciprocalExchangePanel({ incoming, profile, connections, onOpenMyCards }: ReciprocalExchangePanelProps) {
   const hasEventContext = Boolean(incoming.eventName);
+  const fingerprint = incomingFingerprint(incoming);
   const [mode, setMode] = useState<CardMode>(hasEventContext ? 'event' : 'personal');
   const [receipt, setReceipt] = useState<ExchangeReceipt | null>(() => loadReceipt(incoming));
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState<'share' | 'download' | ''>('');
   const [presenting, setPresenting] = useState(false);
   const exportQrRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    setReceipt(loadReceipt(incoming));
+    setMode(hasEventContext ? 'event' : 'personal');
+  }, [fingerprint, hasEventContext, incoming]);
 
   useEffect(() => {
     if (!status) return undefined;
