@@ -99,7 +99,6 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [confidence, setConfidence] = useState<EventPreviewResponse['confidence']>();
-  const [sourceKind, setSourceKind] = useState<EventPreviewResponse['sourceKind']>();
 
   function updateDraft<K extends keyof EventDraft>(key: K, value: EventDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -116,7 +115,6 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
     setError('');
     setMessage('');
     setConfidence(undefined);
-    setSourceKind(undefined);
 
     try {
       const response = await fetch(`/api/event-preview?url=${encodeURIComponent(normalized)}`, {
@@ -134,7 +132,6 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
       }));
       setEventUrl(payload.url || normalized);
       setConfidence(payload.confidence);
-      setSourceKind(payload.sourceKind);
 
       if (!response.ok || !payload.ok) {
         setError(payload.error || 'TagOnce could not extract every event detail. Complete the form manually.');
@@ -160,7 +157,6 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
     setMessage('');
     setError('');
     setConfidence(undefined);
-    setSourceKind(undefined);
   }
 
   function createEventCard() {
@@ -178,7 +174,6 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
     onChange({
       ...profile,
       eventName: title,
-      eventStartsAt: undefined,
       eventStartAt: localInputToIso(draft.startAt),
       eventEndAt: localInputToIso(draft.endAt),
       eventEndsAt: expirationDate,
@@ -189,7 +184,7 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
         ...profile.cardSelections,
         event: selectedEventFields,
       },
-    } as MyProfile);
+    });
     onOpenCards();
   }
 
