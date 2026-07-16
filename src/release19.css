@@ -1,0 +1,235 @@
+/* Release 0.19: editable return profiles and mobile Calendar status */
+.mobile-google-device-status {
+  display: none;
+}
+
+.return-profile-editor {
+  overflow: hidden;
+  border: 1px solid #e3dbe8;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.return-profile-editor-toggle {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 14px;
+  border: 0;
+  background: transparent;
+  color: #302638;
+  text-align: left;
+  cursor: pointer;
+}
+
+.return-profile-editor-toggle > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.return-profile-editor-toggle strong,
+.return-profile-editor-toggle small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.return-profile-editor-toggle small {
+  color: #857b8b;
+  font-size: 11px;
+}
+
+.return-profile-editor-toggle > svg {
+  color: #796c80;
+  transition: transform 160ms ease;
+}
+
+.return-profile-editor.open .return-profile-editor-toggle > svg {
+  transform: rotate(180deg);
+}
+
+.return-profile-editor-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: #efe8ff;
+  color: #6c49ce;
+}
+
+.return-profile-editor-fields {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-top: 1px solid #eee8f1;
+}
+
+.return-profile-editor-fields .field {
+  margin: 0;
+}
+
+.return-required-field > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.return-required-field > span strong {
+  color: #6949cd;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.return-profile-warning {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 11px;
+  border: 1px solid #efd9a5;
+  border-radius: 11px;
+  background: #fff9e9;
+  color: #815d16;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.return-editor-done {
+  width: fit-content;
+}
+
+.return-card-incomplete {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.return-qr-locked {
+  width: 126px;
+  height: 126px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 7px;
+  border-radius: 10px;
+  background: #f3eff5;
+  color: #827689;
+}
+
+.return-qr-locked small {
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.reciprocal-exchange-actions .button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .mobile-google-device-status {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 13px;
+    border: 1px solid #e2dae7;
+    border-radius: 15px;
+    background: #fff;
+    box-shadow: 0 10px 26px rgba(42, 28, 52, 0.07);
+  }
+
+  .mobile-google-device-status > span:nth-child(2) {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .mobile-google-device-status strong {
+    font-size: 12px;
+  }
+
+  .mobile-google-device-status small {
+    color: #857c8a;
+    font-size: 10px;
+    line-height: 1.35;
+  }
+
+  .mobile-google-device-status button {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 9px;
+    background: #6d4bd2;
+    color: #fff;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 780;
+  }
+
+  .mobile-google-device-icon {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 11px;
+    background: #f0ebf5;
+    color: #6e6474;
+  }
+
+  .mobile-google-device-status.state-connected {
+    border-color: #cfe6d5;
+    background: #f7fcf8;
+  }
+
+  .mobile-google-device-status.state-connected .mobile-google-device-icon {
+    background: #e4f5e8;
+    color: #2f7b46;
+  }
+
+  .mobile-google-device-status.state-connecting .mobile-google-device-icon,
+  .mobile-google-device-status.state-checking .mobile-google-device-icon {
+    background: #eee8ff;
+    color: #6b48cc;
+  }
+
+  .return-profile-editor-fields .two-field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .return-editor-done {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .return-qr-locked {
+    width: min(210px, 58vw);
+    height: min(210px, 58vw);
+  }
+}
+
+@media (max-width: 430px) {
+  .mobile-google-device-status {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .mobile-google-device-status button {
+    grid-column: 1 / -1;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .return-profile-editor-toggle {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .return-profile-editor-toggle > svg {
+    display: none;
+  }
+}
