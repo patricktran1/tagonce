@@ -1,3 +1,5 @@
+@import './release15.css';
+
 /* Release 0.14: recipient-side event context */
 .received-event-context {
   display: grid;
