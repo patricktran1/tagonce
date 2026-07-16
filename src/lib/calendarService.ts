@@ -143,13 +143,19 @@ export async function getCalendarEventSuggestions(eventName = '') {
   return payload;
 }
 
-export function connectGoogleCalendar(returnView?: unknown, loginHint = '', selectAccount = false) {
+export function connectGoogleCalendar(
+  returnView?: unknown,
+  loginHint = '',
+  selectAccount = false,
+  enableSync = false,
+) {
   rememberGoogleCalendarReturn(returnView);
 
   const target = new URL('/api/google-calendar/connect', window.location.origin);
   const normalizedHint = loginHint.trim();
   if (normalizedHint) target.searchParams.set('login_hint', normalizedHint);
   if (selectAccount) target.searchParams.set('select_account', '1');
+  if (enableSync) target.searchParams.set('enable_sync', '1');
   window.location.assign(`${target.pathname}${target.search}`);
 }
 
