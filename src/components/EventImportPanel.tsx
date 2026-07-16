@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Clock3,
   ExternalLink,
+  FileUp,
   Link2,
   Loader2,
   MapPin,
@@ -11,7 +12,8 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { importCalendarFile } from '../lib/icsImport';
 import type { MyProfile } from '../types';
 
 interface EventImportPanelProps {
@@ -96,9 +98,11 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
   const [eventUrl, setEventUrl] = useState(profile.eventUrl || '');
   const [draft, setDraft] = useState<EventDraft>(() => draftFromProfile(profile));
   const [loading, setLoading] = useState(false);
+  const [importingCalendar, setImportingCalendar] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [confidence, setConfidence] = useState<EventPreviewResponse['confidence']>();
+  const calendarFileRef = useRef<HTMLInputElement>(null);
 
   function updateDraft<K extends keyof EventDraft>(key: K, value: EventDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -151,6 +155,41 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
     }
   }
 
+  async function importInvite(file: File | undefined, input: HTMLInputElement) {
+    if (!file) return;
+    setImportingCalendar(true);
+    setError('');
+    setMessage('');
+    setConfidence(undefined);
+    try {
+      const { selected, eventCount } = await importCalendarFile(file);
+      setDraft((current) => ({
+        ...current,
+        title: selected.title || current.title,
+        startAt: selected.startAt ? isoToLocalInput(selected.startAt) : current.startAt,
+        endAt: selected.endAt ? isoToLocalInput(selected.endAt) : current.endAt,
+        location: selected.location || current.location,
+        url: selected.url || current.url,
+        description: selected.description || current.description,
+        imageUrl: '',
+      }));
+      if (selected.url) setEventUrl(selected.url);
+      setConfidence(selected.warnings.length ? 'medium' : 'high');
+      const selectionNote = eventCount > 1
+        ? ` TagOnce found ${eventCount} events and selected the nearest upcoming one.`
+        : '';
+      const warningNote = selected.warnings.length
+        ? ` Review: ${selected.warnings.join(' ')}`
+        : '';
+      setMessage(`Loaded locally from ${selected.sourceFile}.${selectionNote}${warningNote}`);
+    } catch (inviteError) {
+      setError(inviteError instanceof Error ? inviteError.message : 'The calendar invite could not be read.');
+    } finally {
+      setImportingCalendar(false);
+      input.value = '';
+    }
+  }
+
   function clearDraft() {
     setEventUrl('');
     setDraft({ title: '', startAt: '', endAt: '', location: '', url: '', description: '', imageUrl: '' });
@@ -197,7 +236,7 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
           <span className="step-badge">1</span>
           <div>
             <h3>Load an event</h3>
-            <p>Paste a Luma or public event link, or enter the details manually.</p>
+            <p>Paste a public event link, upload a calendar invite, or enter the details manually.</p>
           </div>
         </div>
         {hasDraft && (
@@ -207,22 +246,41 @@ export function EventImportPanel({ profile, onChange, onOpenCards }: EventImport
         )}
       </div>
 
-      <div className="event-link-importer">
-        <div className="event-link-input">
-          <Link2 size={18} />
-          <input
-            value={eventUrl}
-            onChange={(event) => setEventUrl(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void importEvent();
-            }}
-            placeholder="Paste a Luma or event link"
-            inputMode="url"
-          />
+      <div className="event-import-methods">
+        <div className="event-link-importer">
+          <div className="event-link-input">
+            <Link2 size={18} />
+            <input
+              value={eventUrl}
+              onChange={(event) => setEventUrl(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void importEvent();
+              }}
+              placeholder="Paste a Luma or event link"
+              inputMode="url"
+            />
+          </div>
+          <button className="button primary" type="button" disabled={loading || importingCalendar || !eventUrl.trim()} onClick={() => void importEvent()}>
+            {loading ? <Loader2 className="spin" size={17} /> : <Sparkles size={17} />}
+            {loading ? 'Reading event…' : 'Load link'}
+          </button>
         </div>
-        <button className="button primary" type="button" disabled={loading || !eventUrl.trim()} onClick={() => void importEvent()}>
-          {loading ? <Loader2 className="spin" size={17} /> : <Sparkles size={17} />}
-          {loading ? 'Reading event…' : 'Load event'}
+
+        <div className="event-import-divider"><span>or</span></div>
+
+        <input
+          ref={calendarFileRef}
+          className="hidden-file-input"
+          type="file"
+          accept=".ics,text/calendar"
+          onChange={(event) => void importInvite(event.target.files?.[0], event.currentTarget)}
+        />
+        <button className="event-ics-upload" type="button" disabled={loading || importingCalendar} onClick={() => calendarFileRef.current?.click()}>
+          {importingCalendar ? <Loader2 className="spin" size={20} /> : <FileUp size={20} />}
+          <span>
+            <strong>{importingCalendar ? 'Reading calendar invite…' : 'Upload .ics calendar invite'}</strong>
+            <small>Apple Calendar, Outlook, Google Calendar exports and emailed invitations. Parsed only on this device.</small>
+          </span>
         </button>
       </div>
 
