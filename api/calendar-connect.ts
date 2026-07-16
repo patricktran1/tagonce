@@ -241,7 +241,7 @@ function rankEvent(
   const occursInRequestedRange = validDateOnly(requestedLocalDate)
     && eventDate >= requestedLocalDate
     && eventDate < rangeEndDate;
-  let relevance: 'happening_now' | 'starting_soon' | 'recently_ended' | 'today' | 'upcoming';
+  let relevance: 'happening_now' | 'starting_soon' | 'recently_ended' | 'today';
   let score: number;
 
   if (start <= now && end >= now) {
@@ -257,7 +257,7 @@ function rankEvent(
     relevance = 'today';
     score = startsIn > 0 ? 65 - Math.min(startsIn, 720) / 60 : 40;
   } else if (rangeDays > 1 && startsIn > 0 && occursInRequestedRange) {
-    relevance = 'upcoming';
+    relevance = 'today';
     score = 50 - Math.min(startsIn, rangeDays * 1440) / (rangeDays * 72);
   } else {
     return null;
