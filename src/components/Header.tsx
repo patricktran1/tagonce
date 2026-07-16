@@ -8,7 +8,6 @@ import {
   LogOut,
   Repeat2,
   Search,
-  Trash2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { GoogleAccountIdentity } from '../types';
@@ -26,7 +25,7 @@ interface HeaderProps {
   onConnectGoogle: () => void;
   onSwitchGoogle: () => Promise<void>;
   onLogout: () => Promise<void>;
-  onEraseWorkspace: () => Promise<void>;
+  onEraseWorkspace?: () => Promise<void>;
 }
 
 export function Header({
@@ -41,10 +40,9 @@ export function Header({
   onConnectGoogle,
   onSwitchGoogle,
   onLogout,
-  onEraseWorkspace,
 }: HeaderProps) {
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState<'switch' | 'logout' | 'erase' | ''>('');
+  const [busy, setBusy] = useState<'switch' | 'logout' | ''>('');
   const menuRef = useRef<HTMLDivElement>(null);
   const connected = Boolean(googleIdentity?.email);
   const avatarUrl = profileAvatarUrl || googleIdentity?.picture;
@@ -72,7 +70,7 @@ export function Header({
     action();
   }
 
-  async function run(action: 'switch' | 'logout' | 'erase', callback: () => Promise<void>) {
+  async function run(action: 'switch' | 'logout', callback: () => Promise<void>) {
     setBusy(action);
     try {
       await callback();
@@ -130,11 +128,11 @@ export function Header({
               <div className="account-menu-section" role="none">
                 <button type="button" role="menuitem" onClick={() => navigate(onOpenProfile)}>
                   <IdCard size={17} />
-                  <span><strong>My profile and QR cards</strong><small>Edit the profile created from Google</small></span>
+                  <span><strong>My profile and QR cards</strong><small>Edit your identity and sharing choices</small></span>
                 </button>
                 <button type="button" role="menuitem" onClick={() => navigate(onOpenCalendar)}>
                   <CalendarDays size={17} />
-                  <span><strong>Google Calendar and events</strong><small>Choose an event or import a link</small></span>
+                  <span><strong>Events & Calendar</strong><small>Choose a calendar event or paste an event link</small></span>
                 </button>
               </div>
 
@@ -143,11 +141,11 @@ export function Header({
                   <>
                     <button type="button" role="menuitem" disabled={Boolean(busy)} onClick={() => void run('switch', onSwitchGoogle)}>
                       <Repeat2 size={17} />
-                      <span><strong>{busy === 'switch' ? 'Opening Google…' : 'Switch Google account'}</strong><small>Create or load another Google-based profile</small></span>
+                      <span><strong>{busy === 'switch' ? 'Opening Google…' : 'Switch Google account'}</strong><small>Use another Google profile and Calendar</small></span>
                     </button>
                     <button type="button" role="menuitem" disabled={Boolean(busy)} onClick={() => void run('logout', onLogout)}>
                       <LogOut size={17} />
-                      <span><strong>{busy === 'logout' ? 'Logging out…' : 'Log out'}</strong><small>Disconnect Google on this device</small></span>
+                      <span><strong>{busy === 'logout' ? 'Signing out…' : 'Sign out'}</strong><small>Disconnect Google on this device</small></span>
                     </button>
                   </>
                 ) : (
@@ -157,19 +155,6 @@ export function Header({
                   </button>
                 )}
               </div>
-
-              <div className="account-menu-section account-menu-danger" role="none">
-                <button type="button" role="menuitem" disabled={Boolean(busy)} onClick={() => void run('erase', onEraseWorkspace)}>
-                  <Trash2 size={17} />
-                  <span><strong>{busy === 'erase' ? 'Clearing workspace…' : 'Erase this device’s data'}</strong><small>Delete local cards, contacts and beta-studio drafts</small></span>
-                </button>
-              </div>
-
-              <p className="account-menu-footnote">
-                {connected
-                  ? 'Your verified Google name, photo and email are available on this device. Custom edits and saved contacts remain local until TagOnce adds a dedicated sync backend.'
-                  : 'Continue with Google to create a profile and connect read-only Calendar in one step.'}
-              </p>
             </div>
           )}
         </div>
