@@ -20,7 +20,6 @@ import {
   getCalendarStatus,
   type CalendarConnectionState,
   type CalendarEventSuggestion,
-  type CalendarRangeDays,
 } from '../lib/calendarService';
 import type { MyProfile } from '../types';
 import { EventImportPanel } from './EventImportPanel';
@@ -31,12 +30,13 @@ interface EventCardLauncherProps {
   onOpenCards: () => void;
 }
 
+type CalendarRangeDays = 1 | 7 | 30;
+
 const relevanceLabels: Record<CalendarEventSuggestion['relevance'], string> = {
   happening_now: 'Happening now',
   starting_soon: 'Starting soon',
   recently_ended: 'Just ended',
   today: 'Today',
-  upcoming: 'Upcoming',
 };
 
 const calendarRanges: Array<{ days: CalendarRangeDays; label: string }> = [
@@ -102,6 +102,13 @@ function localDateValue(value: string) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function calendarBadgeLabel(event: CalendarEventSuggestion, rangeDays: CalendarRangeDays) {
+  const eventDate = localDateValue(event.start);
+  const today = localDateValue(new Date().toISOString());
+  if (rangeDays > 1 && eventDate !== today) return 'Upcoming';
+  return relevanceLabels[event.relevance];
 }
 
 function eventBoundaries(event: CalendarEventSuggestion) {
@@ -430,7 +437,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
                     {events.map((event) => (
                       <article className={event.matchesCard ? 'live-event-card matches-card' : 'live-event-card'} key={event.id}>
                         <div className="live-event-card-topline">
-                          <span className="calendar-relevance-pill">{event.matchesCard ? 'Matches current card' : relevanceLabels[event.relevance]}</span>
+                          <span className="calendar-relevance-pill">{event.matchesCard ? 'Matches current card' : calendarBadgeLabel(event, rangeDays)}</span>
                           {event.htmlLink && <a href={event.htmlLink} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open</a>}
                         </div>
                         <h3>{event.title}</h3>
