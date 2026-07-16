@@ -56,6 +56,15 @@ export function rememberGoogleCalendarAccount(email: string) {
   }
 }
 
+export function clearRememberedGoogleCalendarAccount() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(GOOGLE_ACCOUNT_KEY);
+  } catch {
+    // The secure Calendar session can still be disconnected independently.
+  }
+}
+
 export function restoreGoogleCalendarReturn() {
   if (typeof window === 'undefined') return;
   const current = new URL(window.location.href);
@@ -69,7 +78,7 @@ export function restoreGoogleCalendarReturn() {
     saved = window.sessionStorage.getItem(CALENDAR_RETURN_KEY) || '';
     window.sessionStorage.removeItem(CALENDAR_RETURN_KEY);
   } catch {
-    // The callback can still open the Live Event page without session storage.
+    // The callback can still open the Event Launcher without session storage.
   }
 
   if (!saved) {
@@ -127,12 +136,13 @@ export async function getCalendarEventSuggestions(eventName = '') {
   return payload;
 }
 
-export function connectGoogleCalendar(returnView?: unknown, loginHint = '') {
+export function connectGoogleCalendar(returnView?: unknown, loginHint = '', selectAccount = false) {
   rememberGoogleCalendarReturn(returnView);
 
   const target = new URL('/api/google-calendar/connect', window.location.origin);
   const normalizedHint = loginHint.trim();
   if (normalizedHint) target.searchParams.set('login_hint', normalizedHint);
+  if (selectAccount) target.searchParams.set('select_account', '1');
   window.location.assign(`${target.pathname}${target.search}`);
 }
 
