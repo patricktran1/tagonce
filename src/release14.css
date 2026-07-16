@@ -5,6 +5,7 @@
 @import './release19.css';
 @import './release20.css';
 @import './release21.css';
+@import './release22.css';
 
 /* Release 0.14: recipient-side event context */
 .received-event-context {
