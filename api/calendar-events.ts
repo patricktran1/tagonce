@@ -38,6 +38,10 @@ function validDateOnly(value = '') {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function validRangeDays(value = '') {
+  return value === '1' || value === '7' || value === '30';
+}
+
 function addDays(value: string, days: number) {
   const [year, month, day] = value.split('-').map(Number);
   const date = new Date(Date.UTC(year, month - 1, day + days));
@@ -51,16 +55,22 @@ function looksLikeLegacyAllDayEvent(event: CalendarEventSuggestion) {
     && /^\d{4}-\d{2}-\d{2}T23:59:59\.999Z$/.test(event.end);
 }
 
-function normalizeAllDayEvents(events: CalendarEventSuggestion[], localDate: string) {
+function normalizeAllDayEvents(
+  events: CalendarEventSuggestion[],
+  localDate: string,
+  rangeDays: number,
+) {
   return events.flatMap((event) => {
     if (!looksLikeLegacyAllDayEvent(event)) return [event];
 
     const startDate = event.start!.slice(0, 10);
     const endExclusive = addDays(event.end!.slice(0, 10), 1);
+    const rangeEnd = validDateOnly(localDate) ? addDays(localDate, rangeDays) : '';
 
-    // Google date-only values are calendar dates, not UTC instants. Only surface
-    // all-day events that actually include the user's current local date.
-    if (validDateOnly(localDate) && !(startDate <= localDate && localDate < endExclusive)) {
+    if (
+      validDateOnly(localDate)
+      && !(startDate < rangeEnd && localDate < endExclusive)
+    ) {
       return [];
     }
 
@@ -69,7 +79,7 @@ function normalizeAllDayEvents(events: CalendarEventSuggestion[], localDate: str
       start: startDate,
       end: endExclusive,
       allDay: true,
-      relevance: 'today',
+      relevance: startDate === localDate ? 'today' : 'upcoming',
     }];
   });
 }
@@ -85,6 +95,10 @@ export default {
     if (requestedEventName) upstreamUrl.searchParams.set('eventName', requestedEventName);
     const localDate = requestUrl.searchParams.get('localDate') || '';
     if (validDateOnly(localDate)) upstreamUrl.searchParams.set('localDate', localDate);
+    const days = validRangeDays(requestUrl.searchParams.get('days') || '')
+      ? requestUrl.searchParams.get('days')!
+      : '1';
+    upstreamUrl.searchParams.set('days', days);
 
     const upstream = await fetch(upstreamUrl, {
       method: 'GET',
@@ -107,7 +121,7 @@ export default {
 
     const normalizedPayload = {
       ...payload,
-      events: normalizeAllDayEvents(payload.events || [], localDate),
+      events: normalizeAllDayEvents(payload.events || [], localDate, Number(days)),
     };
 
     const headers = new Headers();
