@@ -56,7 +56,7 @@ export function eventSessionFromProfile(profile: MyProfile): ActiveEventSession 
   };
 }
 
-export function loadActiveEventSession() {
+export function loadActiveEventSession(): ActiveEventSession | null {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(ACTIVE_EVENT_SESSION_KEY) || 'null') as ActiveEventSession | null;
     return parsed?.eventName && parsed?.startedAt ? parsed : null;
@@ -77,7 +77,10 @@ export function sessionMeetingContext(session: ActiveEventSession) {
   return [session.eventName, session.eventLocation].filter(Boolean).join(' · ');
 }
 
-export function attachEventSessionToContact(entity: MentionEntity, session: ActiveEventSession | null) {
+export function attachEventSessionToContact(
+  entity: MentionEntity,
+  session: ActiveEventSession | null,
+): MentionEntity {
   if (!session) return entity;
   const context = sessionMeetingContext(session);
   const encounters = entity.encounters?.length
