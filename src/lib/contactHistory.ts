@@ -73,6 +73,9 @@ function encounterFingerprint(encounter: ContactEncounter) {
     normalizeText(encounter.notes),
     encounter.memoryPhotoDataUrl ? 'photo' : '',
     encounter.sourceCardMode || '',
+    encounter.followUpAt || '',
+    normalizeText(encounter.followUpNote),
+    encounter.followUpCompletedAt || '',
   ].join('|');
 }
 
