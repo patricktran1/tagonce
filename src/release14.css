@@ -21,6 +21,7 @@
 @import './release35.css';
 @import './release36.css';
 @import './release37.css';
+@import './release38.css';
 
 /* Release 0.14: recipient-side event context */
 .received-event-context {
@@ -47,15 +48,4 @@
 .received-event-context-title {
   color: #2f2536 !important;
   font-size: 13px !important;
-}
-
-.received-event-context > a {
-  width: fit-content;
-  color: #6746c8;
-  font-weight: 750;
-}
-
-.received-event-context > a:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
