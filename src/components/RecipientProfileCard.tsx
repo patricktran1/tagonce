@@ -1,7 +1,6 @@
 import {
   CalendarDays,
   ContactRound,
-  Download,
   ExternalLink,
   Globe2,
   Mail,
@@ -39,17 +38,6 @@ function whatsappUrl(value?: string) {
   return digits ? `https://wa.me/${digits}` : '';
 }
 
-function socialDisplay(identity: SharedSocialIdentity) {
-  if (identity.handle?.trim()) return identity.handle.trim().replace(/^@?/, '@');
-  if (!identity.profileUrl) return '';
-  try {
-    const url = new URL(identity.profileUrl);
-    return url.pathname.replace(/^\/+|\/+$/g, '') || url.hostname;
-  } catch {
-    return identity.profileUrl;
-  }
-}
-
 function eventTimeSummary(payload: ShareCardPayload) {
   if (!payload.eventStartAt) return '';
   const start = new Date(payload.eventStartAt);
@@ -77,7 +65,11 @@ export function RecipientProfileCard({ payload }: RecipientProfileCardProps) {
   const eventUrl = safeHttpUrl(payload.eventUrl);
   const eventTime = eventTimeSummary(payload);
   const socialEntries = (Object.entries(payload.socials) as Array<[SocialPlatform, SharedSocialIdentity]>)
-    .map(([platform, identity]) => ({ platform, identity, url: socialProfileUrl(platform, identity) }))
+    .map(([platform, identity]) => ({
+      platform,
+      url: socialProfileUrl(platform, identity),
+      label: socialPlatformMeta[platform].label,
+    }))
     .filter((entry) => Boolean(entry.url));
 
   return (
@@ -96,9 +88,9 @@ export function RecipientProfileCard({ payload }: RecipientProfileCardProps) {
       </div>
 
       <div className="recipient-profile-identity">
-        <small>{payload.eventName || `${payload.mode} TagOnce card`}</small>
+        <small>TagOnce contact</small>
         <h2>{profile.displayName}</h2>
-        <p>{[profile.title, profile.company].filter(Boolean).join(' · ') || 'Shared a TagOnce contact card'}</p>
+        <p>{[profile.title, profile.company].filter(Boolean).join(' · ') || 'Contact card'}</p>
       </div>
 
       <div className="recipient-connect-actions" aria-label="Ways to connect">
@@ -114,6 +106,12 @@ export function RecipientProfileCard({ payload }: RecipientProfileCardProps) {
         {website && (
           <a href={website} target="_blank" rel="noreferrer"><Globe2 size={20} /><span>Website</span></a>
         )}
+        {socialEntries.map(({ platform, url, label }) => (
+          <a href={url} target="_blank" rel="noreferrer" key={platform}>
+            <PlatformMark platform={platform} size="sm" />
+            <span>{label}</span>
+          </a>
+        ))}
         <button type="button" onClick={() => downloadVCard(payload)}>
           <ContactRound size={20} /><span>Save contact</span>
         </button>
@@ -127,29 +125,6 @@ export function RecipientProfileCard({ payload }: RecipientProfileCardProps) {
           {eventUrl && <a href={eventUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Open event page</a>}
         </div>
       )}
-
-      {socialEntries.length > 0 && (
-        <div className="recipient-social-panel">
-          <div className="recipient-social-heading">
-            <strong>Connect on socials</strong>
-            <small>Only profiles they chose to share</small>
-          </div>
-          {socialEntries.map(({ platform, identity, url }) => {
-            const meta = socialPlatformMeta[platform];
-            return (
-              <a href={url} target="_blank" rel="noreferrer" key={platform}>
-                <PlatformMark platform={platform} />
-                <span><strong>{meta.label}</strong><small>{socialDisplay(identity) || 'Shared profile'}</small></span>
-                <span>{meta.action}<ExternalLink size={13} /></span>
-              </a>
-            );
-          })}
-        </div>
-      )}
-
-      <button className="button secondary full-button recipient-download-button" type="button" onClick={() => downloadVCard(payload)}>
-        <Download size={17} /> Download complete vCard
-      </button>
     </section>
   );
 }
