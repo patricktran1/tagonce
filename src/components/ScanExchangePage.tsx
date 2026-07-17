@@ -1,7 +1,8 @@
 import { ContactRound, Repeat2, UserRound } from 'lucide-react';
 import { useState } from 'react';
-import { decodeCardPayload } from '../lib/cardExchange';
+import { decodeCardPayload, extractCardToken } from '../lib/cardExchange';
 import type { MentionEntity, MyProfile, ShareCardPayload, SocialConnection } from '../types';
+import { InAppQrScanner } from './InAppQrScanner';
 import { RecipientProfileCard } from './RecipientProfileCard';
 import { ReciprocalExchangePanel } from './ReciprocalExchangePanel';
 import { ScanPage } from './ScanPage';
@@ -37,6 +38,10 @@ export function ScanExchangePage({
 }: ScanExchangePageProps) {
   const [incoming] = useState<ShareCardPayload | null>(incomingCardFromUrl);
   const [activeStep, setActiveStep] = useState<ExchangeStep>('card');
+  const cardParameter = new URLSearchParams(window.location.search).get('card') || '';
+  const initialScanError = cardParameter && !incoming
+    ? 'That QR is not a valid TagOnce card. Ask the person to show their current TagOnce QR.'
+    : '';
 
   function saveContactWithAvatar(entity: MentionEntity) {
     onSaveContact({
@@ -53,14 +58,36 @@ export function ScanExchangePage({
     });
   }
 
+  function openScannedCard(value: string) {
+    const token = extractCardToken(value);
+    if (!token) return 'No card code was found in that QR.';
+
+    try {
+      decodeCardPayload(token);
+    } catch (scanError) {
+      return scanError instanceof Error
+        ? scanError.message
+        : 'This QR is not a valid TagOnce card.';
+    }
+
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('card', token);
+    window.location.assign(url.toString());
+    return undefined;
+  }
+
   const pageClasses = [
     'scan-exchange-page',
-    incoming ? 'has-incoming-card' : '',
+    incoming ? 'has-incoming-card' : 'has-in-app-scanner',
     incoming?.eventName ? 'has-event-context' : '',
   ].filter(Boolean).join(' ');
 
   return (
     <div className={pageClasses}>
+      {!incoming && <InAppQrScanner initialError={initialScanError} onDetected={openScannedCard} />}
+
       {incoming && (
         <nav className="exchange-journey-nav" aria-label="Exchange steps">
           <button
@@ -95,7 +122,7 @@ export function ScanExchangePage({
 
       {incoming && <RecipientProfileCard payload={incoming} />}
 
-      <ScanPage onSaveContact={saveContactWithAvatar} onOpenAddressBook={onOpenAddressBook} />
+      {incoming && <ScanPage onSaveContact={saveContactWithAvatar} onOpenAddressBook={onOpenAddressBook} />}
 
       {incoming && (
         <div id="tagonce-return-card" className="return-card-anchor">
