@@ -1,0 +1,40 @@
+/* Release 0.32: simplify the desktop event QR workflow */
+@media (min-width: 981px) {
+  .inline-event-context {
+    grid-template-columns: minmax(0, 1.5fr) minmax(220px, .9fr);
+    align-items: end;
+    gap: 12px;
+  }
+
+  .inline-event-context .event-context-heading {
+    grid-column: 1 / -1;
+  }
+
+  .inline-event-context .event-context-heading small {
+    display: none;
+  }
+
+  .inline-event-context .two-field-row {
+    display: contents;
+  }
+
+  .inline-event-context label.field:has(input[type='date']),
+  .inline-event-context .two-field-row:has(input[type='datetime-local']) > .field:nth-child(2),
+  .inline-event-context > label.field {
+    display: none;
+  }
+
+  .inline-event-context .field {
+    margin: 0;
+  }
+
+  .pocket-qr-preview .share-card-event-context > a,
+  .pocket-qr-preview .share-card-event-context > span:has(.lucide-map-pin) {
+    display: none;
+  }
+
+  .pocket-field-selector,
+  .card-handoff-note {
+    display: none;
+  }
+}
