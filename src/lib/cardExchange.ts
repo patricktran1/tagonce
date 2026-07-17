@@ -1,4 +1,29 @@
+import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
 import type { ShareCardPayload } from '../types';
+
+const COMPRESSED_TOKEN_PREFIX = 'z1~';
+
+interface CompactCardPayload {
+  v: 1;
+  m: ShareCardPayload['mode'];
+  c: string;
+  e?: string;
+  b?: string;
+  d?: string;
+  l?: string;
+  u?: string;
+  p: {
+    n: string;
+    a?: string;
+    t?: string;
+    c?: string;
+    e?: string;
+    p?: string;
+    w?: string;
+    u?: string;
+  };
+  s?: Record<string, { h?: string; u?: string }>;
+}
 
 function bytesToBase64(bytes: Uint8Array) {
   let binary = '';
@@ -47,16 +72,103 @@ function enrichedPayload(payload: ShareCardPayload): ShareCardPayload {
   };
 }
 
-export function encodeCardPayload(payload: ShareCardPayload) {
-  const bytes = new TextEncoder().encode(JSON.stringify(enrichedPayload(payload)));
+function compactPayload(payload: ShareCardPayload): CompactCardPayload {
+  const socials = Object.fromEntries(
+    Object.entries(payload.socials)
+      .filter(([, identity]) => Boolean(identity?.handle || identity?.profileUrl))
+      .map(([platform, identity]) => [platform, {
+        h: identity?.handle || undefined,
+        u: identity?.profileUrl || undefined,
+      }]),
+  );
+
+  return {
+    v: 1,
+    m: payload.mode,
+    c: payload.createdAt,
+    e: payload.eventName,
+    b: payload.eventStartAt,
+    d: payload.eventEndAt,
+    l: payload.eventLocation,
+    u: payload.eventUrl,
+    p: {
+      n: payload.profile.displayName,
+      a: payload.profile.avatarUrl,
+      t: payload.profile.title,
+      c: payload.profile.company,
+      e: payload.profile.email,
+      p: payload.profile.phone,
+      w: payload.profile.whatsapp,
+      u: payload.profile.website,
+    },
+    s: Object.keys(socials).length ? socials : undefined,
+  };
+}
+
+function expandCompactPayload(compact: CompactCardPayload): ShareCardPayload {
+  const socials: ShareCardPayload['socials'] = {};
+  Object.entries(compact.s || {}).forEach(([platform, identity]) => {
+    socials[platform as keyof ShareCardPayload['socials']] = {
+      handle: identity.h,
+      profileUrl: identity.u,
+    };
+  });
+
+  return {
+    version: compact.v,
+    mode: compact.m,
+    createdAt: compact.c,
+    eventName: compact.e,
+    eventStartAt: compact.b,
+    eventEndAt: compact.d,
+    eventLocation: compact.l,
+    eventUrl: compact.u,
+    profile: {
+      displayName: compact.p.n,
+      avatarUrl: compact.p.a,
+      title: compact.p.t,
+      company: compact.p.c,
+      email: compact.p.e,
+      phone: compact.p.p,
+      whatsapp: compact.p.w,
+      website: compact.p.u,
+    },
+    socials,
+  };
+}
+
+function encodeLegacyPayload(payload: ShareCardPayload) {
+  const bytes = new TextEncoder().encode(JSON.stringify(payload));
   return bytesToBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
-export function decodeCardPayload(encoded: string): ShareCardPayload {
+function decodeLegacyPayload(encoded: string) {
   const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/');
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
   const decoded = new TextDecoder().decode(base64ToBytes(padded));
-  const payload = permanentContactPayload(JSON.parse(decoded) as ShareCardPayload);
+  return JSON.parse(decoded) as ShareCardPayload;
+}
+
+export function encodeCardPayload(payload: ShareCardPayload) {
+  const enriched = enrichedPayload(payload);
+  const legacyToken = encodeLegacyPayload(enriched);
+  const compressed = compressToEncodedURIComponent(JSON.stringify(compactPayload(enriched)));
+  const compressedToken = compressed ? `${COMPRESSED_TOKEN_PREFIX}${compressed}` : '';
+  return compressedToken && compressedToken.length < legacyToken.length ? compressedToken : legacyToken;
+}
+
+export function decodeCardPayload(encoded: string): ShareCardPayload {
+  let decodedPayload: ShareCardPayload;
+
+  if (encoded.startsWith(COMPRESSED_TOKEN_PREFIX)) {
+    const decompressed = decompressFromEncodedURIComponent(encoded.slice(COMPRESSED_TOKEN_PREFIX.length));
+    if (!decompressed) throw new Error('This TagOnce card could not be decompressed.');
+    decodedPayload = expandCompactPayload(JSON.parse(decompressed) as CompactCardPayload);
+  } else {
+    decodedPayload = decodeLegacyPayload(encoded);
+  }
+
+  const payload = permanentContactPayload(decodedPayload);
   if (payload.version !== 1 || !payload.profile?.displayName || !payload.mode) {
     throw new Error('This is not a valid TagOnce card.');
   }
