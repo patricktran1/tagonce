@@ -1,3 +1,4 @@
+import { Repeat2 } from 'lucide-react';
 import { useState } from 'react';
 import { decodeCardPayload } from '../lib/cardExchange';
 import type { MentionEntity, MyProfile, ShareCardPayload, SocialConnection } from '../types';
@@ -41,6 +42,15 @@ export function ScanExchangePage({
     });
   }
 
+  function openReturnCard() {
+    document.getElementById('tagonce-return-card')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }
+
+  const incomingFirstName = incoming?.profile.displayName.trim().split(/\s+/)[0] || 'them';
+
   return (
     <div className="scan-exchange-page">
       {incoming?.profile.avatarUrl && (
@@ -58,15 +68,31 @@ export function ScanExchangePage({
         </section>
       )}
 
+      {incoming && (
+        <section className="incoming-return-shortcut" aria-label="Share a return card">
+          <span className="incoming-return-shortcut-icon"><Repeat2 size={18} /></span>
+          <span className="incoming-return-shortcut-copy">
+            <small>TWO-WAY EXCHANGE</small>
+            <strong>Share your card back to {incomingFirstName}</strong>
+            <p>Review their card first, or jump to your consent-controlled return card.</p>
+          </span>
+          <button className="button primary small-button" type="button" onClick={openReturnCard}>
+            <Repeat2 size={15} /> Share back
+          </button>
+        </section>
+      )}
+
       <ScanPage onSaveContact={saveContactWithAvatar} onOpenAddressBook={onOpenAddressBook} />
       {incoming && (
-        <ReciprocalExchangePanel
-          incoming={incoming}
-          profile={profile}
-          connections={connections}
-          onChangeProfile={onChangeProfile}
-          onOpenMyCards={onOpenMyCards}
-        />
+        <div id="tagonce-return-card" className="return-card-anchor">
+          <ReciprocalExchangePanel
+            incoming={incoming}
+            profile={profile}
+            connections={connections}
+            onChangeProfile={onChangeProfile}
+            onOpenMyCards={onOpenMyCards}
+          />
+        </div>
       )}
     </div>
   );
