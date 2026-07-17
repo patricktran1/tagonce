@@ -56,6 +56,9 @@ export interface ContactEncounter {
   notes?: string;
   memoryPhotoDataUrl?: string;
   sourceCardMode?: CardMode;
+  followUpAt?: string;
+  followUpNote?: string;
+  followUpCompletedAt?: string;
 }
 
 export interface MentionEntity {
