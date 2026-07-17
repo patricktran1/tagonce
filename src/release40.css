@@ -1,0 +1,270 @@
+/* Release 0.40: local device transfer and workspace backups */
+.device-transfer-launcher {
+  width: 100%;
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  border: 1px solid #ded5e7;
+  border-radius: 14px;
+  padding: 11px 13px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #43374b;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.device-transfer-launcher:hover {
+  border-color: #c5b6dc;
+  background: #fff;
+}
+
+.device-transfer-launcher > svg {
+  color: #6847c8;
+}
+
+.device-transfer-launcher > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.device-transfer-launcher strong {
+  font-size: 12px;
+}
+
+.device-transfer-launcher small {
+  color: #84798a;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.device-transfer-overlay {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 28px;
+  background: rgba(18, 13, 23, 0.64);
+  backdrop-filter: blur(13px);
+}
+
+.device-transfer-dialog {
+  width: min(760px, 100%);
+  display: grid;
+  gap: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 26px;
+  padding: 22px;
+  background: #fff;
+  box-shadow: 0 34px 110px rgba(20, 12, 27, 0.38);
+}
+
+.device-transfer-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.device-transfer-icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  background: linear-gradient(145deg, #efe8ff, #e8ffbd);
+  color: #6543bd;
+}
+
+.device-transfer-header > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.device-transfer-header strong {
+  color: #2d2334;
+  font-size: 20px;
+  letter-spacing: -0.025em;
+}
+
+.device-transfer-header small {
+  color: #817587;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.device-transfer-header > button {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #e3dce7;
+  border-radius: 50%;
+  background: #fff;
+  color: #6d6272;
+  cursor: pointer;
+}
+
+.device-transfer-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.device-transfer-action-grid > button {
+  min-width: 0;
+  min-height: 138px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid #e3dbe8;
+  border-radius: 17px;
+  padding: 16px;
+  background: linear-gradient(145deg, #fff, #faf8fc);
+  color: #34293b;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.device-transfer-action-grid > button:hover:not(:disabled) {
+  border-color: #c7b7dc;
+  transform: translateY(-1px);
+}
+
+.device-transfer-action-grid > button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.device-transfer-action-grid > button > svg {
+  color: #6b49cb;
+}
+
+.device-transfer-action-grid > button > span {
+  display: grid;
+  gap: 4px;
+}
+
+.device-transfer-action-grid strong {
+  font-size: 14px;
+}
+
+.device-transfer-action-grid small {
+  color: #827788;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.device-transfer-review {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid #d9cdec;
+  border-radius: 17px;
+  padding: 15px;
+  background: linear-gradient(145deg, #fbf9ff, #f8fff1);
+}
+
+.device-transfer-review > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.device-transfer-review > div:first-child > strong {
+  overflow: hidden;
+  color: #302438;
+  font-size: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-transfer-review > div:first-child > small {
+  color: #756a7b;
+  font-size: 11px;
+}
+
+.device-transfer-restore-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.device-transfer-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #f1ecfb;
+  color: #583f9f;
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1.4;
+}
+
+.device-transfer-status > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+@media (max-width: 760px) {
+  .device-transfer-launcher {
+    min-height: 60px;
+  }
+
+  .device-transfer-launcher strong {
+    font-size: 13px;
+  }
+
+  .device-transfer-launcher small {
+    font-size: 11px;
+  }
+
+  .device-transfer-overlay {
+    align-items: end;
+    padding: 0;
+  }
+
+  .device-transfer-dialog {
+    width: 100%;
+    max-height: calc(100dvh - env(safe-area-inset-top));
+    overflow: auto;
+    border-radius: 24px 24px 0 0;
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+
+  .device-transfer-action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .device-transfer-action-grid > button {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    padding: 14px;
+  }
+
+  .device-transfer-review {
+    grid-template-columns: 1fr;
+  }
+
+  .device-transfer-restore-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .device-transfer-restore-actions .button {
+    width: 100%;
+    justify-content: center;
+  }
+}
