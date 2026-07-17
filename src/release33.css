@@ -1,0 +1,50 @@
+/* Release 33: person-first recipient exchange hierarchy */
+
+.exchange-journey-nav button:last-child {
+  background: transparent;
+  color: #5b4c64;
+}
+
+.exchange-journey-nav button.active,
+.exchange-journey-nav button.active:last-child {
+  background: #f3edff;
+  color: #5f3fbd;
+  box-shadow: inset 0 0 0 1px rgba(111, 75, 204, 0.08);
+}
+
+.exchange-journey-nav button.active:hover,
+.exchange-journey-nav button.active:focus-visible {
+  background: #eee6ff;
+  color: #5636b7;
+}
+
+#tagonce-recipient-card,
+.memory-capture-panel,
+.return-card-anchor {
+  scroll-margin-top: 118px;
+}
+
+.recipient-connect-actions .platform-mark {
+  flex: 0 0 auto;
+  box-shadow: none;
+}
+
+.recipient-event-panel {
+  margin-top: 2px;
+}
+
+.scan-exchange-page.has-event-context .meeting-context-field {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .recipient-connect-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .recipient-connect-actions > a,
+  .recipient-connect-actions > button {
+    min-height: 82px;
+    padding: 11px 6px;
+  }
+}
