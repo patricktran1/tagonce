@@ -1,0 +1,70 @@
+.incoming-return-shortcut {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid #dfd5e8;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fcf9fd 0%, #f5effa 100%);
+  box-shadow: 0 12px 30px rgba(72, 48, 91, 0.07);
+}
+
+.incoming-return-shortcut-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  color: #6746c8;
+  background: #eee7f8;
+}
+
+.incoming-return-shortcut-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.incoming-return-shortcut-copy small {
+  color: #765f84;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.incoming-return-shortcut-copy strong {
+  color: #2f2536;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.incoming-return-shortcut-copy p {
+  margin: 0;
+  color: #6c6172;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.incoming-return-shortcut .button {
+  white-space: nowrap;
+}
+
+.return-card-anchor {
+  scroll-margin-top: 24px;
+}
+
+@media (max-width: 720px) {
+  .incoming-return-shortcut {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 13px;
+  }
+
+  .incoming-return-shortcut .button {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: center;
+  }
+}
