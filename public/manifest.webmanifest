@@ -1,0 +1,20 @@
+{
+  "name": "TagOnce",
+  "short_name": "TagOnce",
+  "description": "QR contact exchange with event context and relationship memory.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f3f8",
+  "theme_color": "#16151b",
+  "categories": ["social", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
