@@ -12,6 +12,7 @@ import {
   UsersRound,
 } from 'lucide-react';
 import type { Campaign, GoogleAccountIdentity, MentionEntity, MyProfile } from '../types';
+import { FollowUpPreview } from './FollowUpPreview';
 import { ProfileAvatar } from './ProfileAvatar';
 
 interface DashboardPageProps {
@@ -105,6 +106,8 @@ export function DashboardPage({
           <small>Open contacts <ArrowRight size={13} /></small>
         </button>
       </section>
+
+      <FollowUpPreview entities={entities} onOpenContacts={onOpenContacts} />
 
       <section className={`panel calendar-front-door${calendarConnected ? ' connected' : ''}`}>
         <div className="calendar-front-door-icon">{calendarConnected ? <CalendarCheck size={24} /> : <CalendarPlus size={24} />}</div>
