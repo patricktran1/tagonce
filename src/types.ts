@@ -49,6 +49,15 @@ export interface PlatformMapping {
   verified: boolean;
 }
 
+export interface ContactEncounter {
+  id: string;
+  metAt?: string;
+  metOn: string;
+  notes?: string;
+  memoryPhotoDataUrl?: string;
+  sourceCardMode?: CardMode;
+}
+
 export interface MentionEntity {
   id: string;
   displayName: string;
@@ -66,6 +75,7 @@ export interface MentionEntity {
   notes?: string;
   memoryPhotoDataUrl?: string;
   sourceCardMode?: CardMode;
+  encounters?: ContactEncounter[];
   socialProfiles?: Partial<Record<SocialPlatform, SharedSocialIdentity>>;
   initials: string;
   mappings: Partial<Record<Platform, PlatformMapping>>;
