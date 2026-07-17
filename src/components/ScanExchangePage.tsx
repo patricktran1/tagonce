@@ -2,7 +2,7 @@ import { ContactRound, Repeat2, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { decodeCardPayload } from '../lib/cardExchange';
 import type { MentionEntity, MyProfile, ShareCardPayload, SocialConnection } from '../types';
-import { ProfileAvatar } from './ProfileAvatar';
+import { RecipientProfileCard } from './RecipientProfileCard';
 import { ReciprocalExchangePanel } from './ReciprocalExchangePanel';
 import { ScanPage } from './ScanPage';
 
@@ -49,17 +49,11 @@ export function ScanExchangePage({
     });
   }
 
-  function openReturnCard() {
-    scrollToExchangeStep('#tagonce-return-card');
-  }
-
-  const incomingFirstName = incoming?.profile.displayName.trim().split(/\s+/)[0] || 'them';
-
   return (
-    <div className="scan-exchange-page">
+    <div className={`scan-exchange-page${incoming ? ' has-incoming-card' : ''}`}>
       {incoming && (
         <nav className="exchange-journey-nav" aria-label="Exchange steps">
-          <button type="button" onClick={() => scrollToExchangeStep('.received-card-preview')}>
+          <button type="button" onClick={() => scrollToExchangeStep('#tagonce-recipient-card')}>
             <UserRound size={17} />
             <span>Their card</span>
           </button>
@@ -67,43 +61,17 @@ export function ScanExchangePage({
             <ContactRound size={17} />
             <span>Save context</span>
           </button>
-          <button type="button" onClick={openReturnCard}>
+          <button type="button" onClick={() => scrollToExchangeStep('#tagonce-return-card')}>
             <Repeat2 size={17} />
             <span>Share back</span>
           </button>
         </nav>
       )}
 
-      {incoming?.profile.avatarUrl && (
-        <section className="incoming-avatar-banner" aria-label={`${incoming.profile.displayName} profile photo`}>
-          <ProfileAvatar
-            name={incoming.profile.displayName}
-            src={incoming.profile.avatarUrl}
-            className="incoming-card-avatar"
-          />
-          <span>
-            <small>TAGONCE PROFILE</small>
-            <strong>{incoming.profile.displayName}</strong>
-            <p>{[incoming.profile.title, incoming.profile.company].filter(Boolean).join(' · ') || 'Shared a contact card with you'}</p>
-          </span>
-        </section>
-      )}
-
-      {incoming && (
-        <section className="incoming-return-shortcut" aria-label="Share a return card">
-          <span className="incoming-return-shortcut-icon"><Repeat2 size={18} /></span>
-          <span className="incoming-return-shortcut-copy">
-            <small>TWO-WAY EXCHANGE</small>
-            <strong>Share your card back to {incomingFirstName}</strong>
-            <p>Review their card first, or jump to your consent-controlled return card.</p>
-          </span>
-          <button className="button primary small-button" type="button" onClick={openReturnCard}>
-            <Repeat2 size={15} /> Share back
-          </button>
-        </section>
-      )}
+      {incoming && <RecipientProfileCard payload={incoming} />}
 
       <ScanPage onSaveContact={saveContactWithAvatar} onOpenAddressBook={onOpenAddressBook} />
+
       {incoming && (
         <div id="tagonce-return-card" className="return-card-anchor">
           <ReciprocalExchangePanel
