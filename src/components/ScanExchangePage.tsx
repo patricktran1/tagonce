@@ -1,4 +1,4 @@
-import { Repeat2 } from 'lucide-react';
+import { ContactRound, Repeat2, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { decodeCardPayload } from '../lib/cardExchange';
 import type { MentionEntity, MyProfile, ShareCardPayload, SocialConnection } from '../types';
@@ -42,17 +42,38 @@ export function ScanExchangePage({
     });
   }
 
-  function openReturnCard() {
-    document.getElementById('tagonce-return-card')?.scrollIntoView({
+  function scrollToExchangeStep(selector: string) {
+    document.querySelector<HTMLElement>(selector)?.scrollIntoView({
       behavior: 'smooth',
       block: 'start',
     });
+  }
+
+  function openReturnCard() {
+    scrollToExchangeStep('#tagonce-return-card');
   }
 
   const incomingFirstName = incoming?.profile.displayName.trim().split(/\s+/)[0] || 'them';
 
   return (
     <div className="scan-exchange-page">
+      {incoming && (
+        <nav className="exchange-journey-nav" aria-label="Exchange steps">
+          <button type="button" onClick={() => scrollToExchangeStep('.received-card-preview')}>
+            <UserRound size={17} />
+            <span>Their card</span>
+          </button>
+          <button type="button" onClick={() => scrollToExchangeStep('.memory-capture-panel')}>
+            <ContactRound size={17} />
+            <span>Save context</span>
+          </button>
+          <button type="button" onClick={openReturnCard}>
+            <Repeat2 size={17} />
+            <span>Share back</span>
+          </button>
+        </nav>
+      )}
+
       {incoming?.profile.avatarUrl && (
         <section className="incoming-avatar-banner" aria-label={`${incoming.profile.displayName} profile photo`}>
           <ProfileAvatar
