@@ -121,19 +121,12 @@ export interface Campaign {
     | 'draft'
     | 'ready'
     | 'scheduled'
+    | 'publishing'
     | 'published'
-    | 'failed';
+    | 'partial';
   createdAt: string;
   scheduledFor?: string;
-}
-
-export interface SocialConnection {
-  platform: Platform;
-  connected: boolean;
-  method?: ConnectionMethod;
-  handle?: string;
-  profileUrl?: string;
-  accountType?: string;
+  mediaName?: string;
 }
 
 export interface BrandSettings {
@@ -142,6 +135,18 @@ export interface BrandSettings {
   voice: string;
   defaultCta: string;
   preferredHashtags: string;
+}
+
+export interface SocialConnection {
+  platform: Platform;
+  connected: boolean;
+  accountName?: string;
+  accountType?: string;
+  handle?: string;
+  profileUrl?: string;
+  platformId?: string;
+  connectionMethod?: ConnectionMethod;
+  lastCheckedAt?: string;
 }
 
 export interface MyProfile {
@@ -160,15 +165,8 @@ export interface MyProfile {
   eventLocation?: string;
   eventUrl?: string;
   eventDescription?: string;
-  cardSelections?: Partial<Record<CardMode, ShareFieldKey[]>>;
   socialProfiles?: Partial<Record<SocialPlatform, SharedSocialIdentity>>;
-}
-
-export interface GoogleAccountIdentity {
-  sub: string;
-  email: string;
-  displayName?: string;
-  picture?: string;
+  cardSelections?: Partial<Record<CardMode, ShareFieldKey[]>>;
 }
 
 export interface ShareCardPayload {
@@ -192,4 +190,21 @@ export interface ShareCardPayload {
     website?: string;
   };
   socials: Partial<Record<SocialPlatform, SharedSocialIdentity>>;
+}
+
+export interface GoogleAccountIdentity {
+  email: string;
+  displayName?: string;
+  picture?: string;
+}
+
+export interface CloudWorkspace {
+  version: 1;
+  updatedAt: string;
+  profile: MyProfile;
+  entities: MentionEntity[];
+  campaigns: Campaign[];
+  brand: BrandSettings;
+  connections: SocialConnection[];
+  exchangeReceipts?: Record<string, unknown>;
 }
