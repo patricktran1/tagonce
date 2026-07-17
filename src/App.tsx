@@ -19,6 +19,7 @@ import { CampaignComposer } from './components/CampaignComposer';
 import { ConnectionsPage } from './components/ConnectionsPage';
 import { DashboardPage } from './components/DashboardPage';
 import { EventCardLauncher } from './components/EventCardLauncher';
+import { ActiveEventSessionBar, EventSessionPrompt } from './components/EventSessionChrome';
 import { Header } from './components/Header';
 import { MyCardsPage } from './components/MyCardsPage';
 import { ScanExchangePage } from './components/ScanExchangePage';
@@ -34,6 +35,14 @@ import {
   restoreGoogleCalendarReturn,
 } from './lib/calendarService';
 import { contactsMatch, mergeContactRecords, prepareContactRecord } from './lib/contactHistory';
+import {
+  ACTIVE_EVENT_SESSION_KEY,
+  attachEventSessionToContact,
+  eventSessionFromProfile,
+  loadActiveEventSession,
+  saveActiveEventSession,
+  type ActiveEventSession,
+} from './lib/eventSession';
 import { loadLocal, saveLocal } from './lib/storage';
 import type {
   BrandSettings,
@@ -52,7 +61,15 @@ const BRAND_KEY = 'tagonce.brand.v1';
 const CONNECTION_KEY = 'tagonce.connections.v1';
 const PROFILE_KEY = 'tagonce.profile.v1';
 const EXCHANGE_RECEIPT_KEY = 'tagonce.exchange.receipts.v1';
-const WORKSPACE_KEYS = [ENTITY_KEY, CAMPAIGN_KEY, BRAND_KEY, CONNECTION_KEY, PROFILE_KEY, EXCHANGE_RECEIPT_KEY];
+const WORKSPACE_KEYS = [
+  ENTITY_KEY,
+  CAMPAIGN_KEY,
+  BRAND_KEY,
+  CONNECTION_KEY,
+  PROFILE_KEY,
+  EXCHANGE_RECEIPT_KEY,
+  ACTIVE_EVENT_SESSION_KEY,
+];
 
 const defaultConnections: SocialConnection[] = [
   { platform: 'linkedin', connected: false, accountType: 'Personal profile or company page' },
@@ -109,6 +126,7 @@ function initialPage(): PageKey {
   const params = new URLSearchParams(window.location.search);
   if (params.has('card')) return 'scan';
   if (params.get('view') === 'event') return 'event';
+  if (params.get('view') === 'scan') return 'scan';
   return 'dashboard';
 }
 
@@ -135,6 +153,7 @@ export default function App() {
   const [brand, setBrand] = useState<BrandSettings>(() => loadLocal(BRAND_KEY, defaultBrandSettings));
   const [connections, setConnections] = useState<SocialConnection[]>(() => loadLocal(CONNECTION_KEY, defaultConnections));
   const [profile, setProfile] = useState<MyProfile>(() => loadLocal(PROFILE_KEY, defaultProfile));
+  const [activeEventSession, setActiveEventSession] = useState<ActiveEventSession | null>(loadActiveEventSession);
   const [googleIdentity, setGoogleIdentity] = useState<GoogleAccountIdentity | null>(() => getRememberedGoogleIdentity());
   const [calendarConnected, setCalendarConnected] = useState(false);
 
@@ -143,6 +162,7 @@ export default function App() {
   useEffect(() => saveLocal(BRAND_KEY, brand), [brand]);
   useEffect(() => saveLocal(CONNECTION_KEY, connections), [connections]);
   useEffect(() => saveLocal(PROFILE_KEY, profile), [profile]);
+  useEffect(() => saveActiveEventSession(activeEventSession), [activeEventSession]);
 
   useEffect(() => {
     setProfile((current) => profileWithGoogleIdentity(current, googleIdentity));
@@ -177,13 +197,31 @@ export default function App() {
 
   function mergeScannedContact(incoming: MentionEntity) {
     setEntities((current) => {
-      const preparedIncoming = prepareContactRecord(incoming);
+      const sessionAttributed = attachEventSessionToContact(incoming, activeEventSession);
+      const preparedIncoming = prepareContactRecord(sessionAttributed);
       const existingIndex = current.findIndex((entity) => contactsMatch(entity, preparedIncoming));
       if (existingIndex < 0) return [preparedIncoming, ...current];
       const existing = current[existingIndex];
       const merged = mergeContactRecords(existing, preparedIncoming);
       return current.map((entity, index) => (index === existingIndex ? merged : entity));
     });
+  }
+
+  function startEventSession() {
+    const session = eventSessionFromProfile(profile);
+    if (!session) return;
+    setActiveEventSession(session);
+    setActivePage('scan');
+  }
+
+  function endEventSession() {
+    if (!activeEventSession) return;
+    const confirmed = window.confirm(
+      `End the live session for ${activeEventSession.eventName}? Its contacts and recap will remain saved.`,
+    );
+    if (!confirmed) return;
+    setActiveEventSession(null);
+    setActivePage('dashboard');
   }
 
   function connectGoogle(returnToEvent = false, selectAccount = false) {
@@ -199,6 +237,7 @@ export default function App() {
     clearRememberedGoogleCalendarAccount();
     setGoogleIdentity(null);
     setCalendarConnected(false);
+    setActiveEventSession(null);
     setProfile(defaultProfile);
     connectGoogle(false, true);
   }
@@ -233,6 +272,7 @@ export default function App() {
     setBrand(defaultBrandSettings);
     setConnections(defaultConnections);
     setProfile(defaultProfile);
+    setActiveEventSession(null);
     setGoogleIdentity(null);
     setCalendarConnected(false);
     setActivePage('dashboard');
@@ -265,6 +305,7 @@ export default function App() {
           <ScanExchangePage
             profile={profile}
             connections={connections}
+            activeEventSession={activeEventSession}
             onChangeProfile={setProfile}
             onSaveContact={mergeScannedContact}
             onOpenAddressBook={() => setActivePage('address')}
@@ -297,7 +338,7 @@ export default function App() {
       case 'settings':
         return <SettingsPage brand={brand} onChange={setBrand} />;
     }
-  }, [activePage, brand, calendarConnected, campaigns, connections, entities, googleIdentity, profile]);
+  }, [activeEventSession, activePage, brand, calendarConnected, campaigns, connections, entities, googleIdentity, profile]);
 
   return (
     <div className="app-shell">
@@ -322,6 +363,18 @@ export default function App() {
           onLogout={logout}
           onEraseWorkspace={eraseWorkspace}
         />
+        {activeEventSession ? (
+          <ActiveEventSessionBar
+            session={activeEventSession}
+            entities={entities}
+            onScan={() => setActivePage('scan')}
+            onShowQr={() => setActivePage('mycard')}
+            onOpenContacts={() => setActivePage('address')}
+            onEnd={endEventSession}
+          />
+        ) : activePage === 'mycard' && profile.eventName.trim() ? (
+          <EventSessionPrompt profile={profile} onStart={startEventSession} />
+        ) : null}
         <div className="page-container">{page}</div>
       </main>
     </div>
