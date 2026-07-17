@@ -12,6 +12,7 @@ import {
   UsersRound,
 } from 'lucide-react';
 import type { Campaign, GoogleAccountIdentity, MentionEntity, MyProfile } from '../types';
+import { EventRecapPreview } from './EventRecapPreview';
 import { FollowUpPreview } from './FollowUpPreview';
 import { ProfileAvatar } from './ProfileAvatar';
 
@@ -107,6 +108,7 @@ export function DashboardPage({
         </button>
       </section>
 
+      <EventRecapPreview entities={entities} onOpenContacts={onOpenContacts} />
       <FollowUpPreview entities={entities} onOpenContacts={onOpenContacts} />
 
       <section className={`panel calendar-front-door${calendarConnected ? ' connected' : ''}`}>
