@@ -66,9 +66,26 @@ export function contactsMatch(left: MentionEntity, right: MentionEntity) {
   return true;
 }
 
+export function inferEncounterEventName(encounter: Pick<ContactEncounter, 'eventName' | 'metAt' | 'sourceCardMode'>) {
+  const explicit = encounter.eventName?.trim();
+  if (explicit) return explicit;
+  if (encounter.sourceCardMode !== 'event') return '';
+  const meeting = encounter.metAt?.trim();
+  if (!meeting) return '';
+  return meeting.split(/\s+·\s+/)[0]?.trim() || meeting;
+}
+
+function normalizeEncounter(encounter: ContactEncounter): ContactEncounter {
+  const eventName = inferEncounterEventName(encounter);
+  return eventName && eventName !== encounter.eventName
+    ? { ...encounter, eventName }
+    : encounter;
+}
+
 function encounterFingerprint(encounter: ContactEncounter) {
   return [
     encounter.metOn,
+    normalizeText(encounter.eventName),
     normalizeText(encounter.metAt),
     normalizeText(encounter.notes),
     encounter.memoryPhotoDataUrl ? 'photo' : '',
@@ -83,6 +100,7 @@ function legacyEncounter(entity: MentionEntity): ContactEncounter | null {
   const hasContext = Boolean(
     entity.metAt
       || entity.metOn
+      || entity.eventName
       || entity.notes
       || entity.memoryPhotoDataUrl
       || entity.sourceCardMode,
@@ -90,14 +108,15 @@ function legacyEncounter(entity: MentionEntity): ContactEncounter | null {
   if (!hasContext) return null;
 
   const metOn = entity.metOn || entity.createdAt || new Date(0).toISOString();
-  return {
+  return normalizeEncounter({
     id: `encounter_${entity.id}_${metOn.replace(/[^a-z0-9]/gi, '')}`,
     metAt: entity.metAt,
     metOn,
+    eventName: entity.eventName,
     notes: entity.notes,
     memoryPhotoDataUrl: entity.memoryPhotoDataUrl,
     sourceCardMode: entity.sourceCardMode,
-  };
+  });
 }
 
 export function contactEncounters(entity: MentionEntity) {
@@ -107,6 +126,7 @@ export function contactEncounters(entity: MentionEntity) {
   const seen = new Set<string>();
 
   return source
+    .map(normalizeEncounter)
     .filter((encounter) => {
       const fingerprint = encounterFingerprint(encounter);
       if (seen.has(fingerprint)) return false;
@@ -128,6 +148,7 @@ function syncLatestEncounter(entity: MentionEntity, encounters: ContactEncounter
     encounters,
     metAt: latest?.metAt || entity.metAt,
     metOn: latest?.metOn || entity.metOn,
+    eventName: latest?.eventName || entity.eventName,
     notes: latest?.notes || entity.notes,
     memoryPhotoDataUrl: latestPhoto || entity.memoryPhotoDataUrl,
     sourceCardMode: latest?.sourceCardMode || entity.sourceCardMode,
@@ -142,6 +163,7 @@ export function mergeContactRecords(existing: MentionEntity, incoming: MentionEn
   const combined = [...contactEncounters(incoming), ...contactEncounters(existing)];
   const seen = new Set<string>();
   const encounters = combined
+    .map(normalizeEncounter)
     .filter((encounter) => {
       const fingerprint = encounterFingerprint(encounter);
       if (seen.has(fingerprint)) return false;
