@@ -24,7 +24,10 @@ interface QrPortabilityPanelProps {
 }
 
 type WakeLockSentinelLike = {
+  released?: boolean;
   release: () => Promise<void>;
+  addEventListener?: (type: 'release', listener: () => void) => void;
+  removeEventListener?: (type: 'release', listener: () => void) => void;
 };
 
 type NavigatorWithWakeLock = Navigator & {
@@ -50,13 +53,38 @@ export function QrPortabilityPanel({ shareUrl, meta }: QrPortabilityPanelProps) 
     if (!presenting) return undefined;
     const previousOverflow = document.body.style.overflow;
     let wakeLock: WakeLockSentinelLike | null = null;
+    let cancelled = false;
+    let enteredNativeFullscreen = Boolean(document.fullscreenElement);
     document.body.style.overflow = 'hidden';
 
+    function handleWakeLockRelease() {
+      wakeLock = null;
+    }
+
     async function keepScreenAwake() {
+      if (cancelled || document.visibilityState !== 'visible' || wakeLock) return;
       try {
-        wakeLock = await (navigator as NavigatorWithWakeLock).wakeLock?.request('screen') ?? null;
+        const nextLock = await (navigator as NavigatorWithWakeLock).wakeLock?.request('screen') ?? null;
+        if (cancelled) {
+          await nextLock?.release();
+          return;
+        }
+        wakeLock = nextLock;
+        wakeLock?.addEventListener?.('release', handleWakeLockRelease);
       } catch {
         wakeLock = null;
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') void keepScreenAwake();
+    }
+
+    function handleFullscreenChange() {
+      if (document.fullscreenElement) {
+        enteredNativeFullscreen = true;
+      } else if (enteredNativeFullscreen) {
+        setPresenting(false);
       }
     }
 
@@ -65,10 +93,17 @@ export function QrPortabilityPanel({ shareUrl, meta }: QrPortabilityPanelProps) 
     }
 
     void keepScreenAwake();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
     window.addEventListener('keydown', closeOnEscape);
+
     return () => {
+      cancelled = true;
       document.body.style.overflow = previousOverflow;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
       window.removeEventListener('keydown', closeOnEscape);
+      wakeLock?.removeEventListener?.('release', handleWakeLockRelease);
       void wakeLock?.release();
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
     };
@@ -137,7 +172,7 @@ export function QrPortabilityPanel({ shareUrl, meta }: QrPortabilityPanelProps) 
     try {
       await document.documentElement.requestFullscreen?.();
     } catch {
-      // The fixed presentation overlay still works when native fullscreen is unavailable.
+      // The fixed event-mode overlay still works when native fullscreen is unavailable.
     }
   }
 
@@ -147,17 +182,18 @@ export function QrPortabilityPanel({ shareUrl, meta }: QrPortabilityPanelProps) 
         <QRCodeSVG ref={exportQrRef} value={shareUrl} size={1024} level="L" marginSize={4} />
       </div>
 
-      <section className="qr-portability-panel" aria-label="QR sharing and downloads">
+      <section className="qr-portability-panel" aria-label="QR presentation, sharing and downloads">
         <div className="qr-portability-heading">
           <span className="qr-portability-icon"><Smartphone size={18} /></span>
           <span>
-            <strong>Take this QR anywhere</strong>
-            <small>Share it to your phone, save an image, or present it full-screen.</small>
+            <strong>Show or share this QR</strong>
+            <small>Open event mode for in-person scanning, or send and save the QR.</small>
           </span>
         </div>
 
         <div className="qr-portability-actions">
-          <button className="button primary" type="button" disabled={Boolean(busy)} onClick={() => void sharePortableQr()}>
+          <button className="button primary qr-present-button" type="button" onClick={() => void openPresentation()}><Maximize2 size={17} /> Present QR</button>
+          <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => void sharePortableQr()}>
             {busy === 'share' ? <span className="button-spinner" /> : <Share2 size={17} />} Share QR
           </button>
           <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => void savePng()}>
@@ -174,32 +210,49 @@ export function QrPortabilityPanel({ shareUrl, meta }: QrPortabilityPanelProps) 
               </div>
             )}
           </div>
-          <button className="button secondary" type="button" onClick={() => void openPresentation()}><Maximize2 size={17} /> Full screen</button>
           <button className="button secondary" type="button" onClick={() => void copyLink()}><Copy size={17} /> Copy link</button>
         </div>
-        {status && <div className="qr-portability-status"><Check size={14} /> {status}</div>}
+        {status && <div className="qr-portability-status" aria-live="polite"><Check size={14} /> {status}</div>}
       </section>
 
       <div className="mobile-qr-action-bar" aria-label="Quick QR actions">
+        <button className="mobile-show-qr-action" type="button" onClick={() => void openPresentation()}><Maximize2 size={19} /><span>Show</span></button>
         <button type="button" disabled={Boolean(busy)} onClick={() => void sharePortableQr()}><Share2 size={19} /><span>Share</span></button>
         <button type="button" disabled={Boolean(busy)} onClick={() => void savePng()}><ImageDown size={19} /><span>Save</span></button>
-        <button type="button" onClick={() => void openPresentation()}><Maximize2 size={19} /><span>Show</span></button>
       </div>
 
       {presenting && (
-        <div className="qr-presentation-overlay" role="dialog" aria-modal="true" aria-label={`${meta.displayName} QR presentation`}>
-          <button className="qr-presentation-close" type="button" onClick={() => setPresenting(false)} aria-label="Close full-screen QR"><X size={22} /></button>
-          <div className="qr-presentation-card">
-            <span className="qr-presentation-brand">TAGONCE</span>
-            <span className="qr-presentation-mode">{meta.eventName || meta.modeLabel}</span>
-            <h2>{meta.displayName}</h2>
-            {meta.subtitle && <p>{meta.subtitle}</p>}
-            <div className="qr-presentation-code">
-              <QRCodeSVG value={shareUrl} size={520} level="L" marginSize={3} title={`Scan to open ${meta.displayName}'s TagOnce card`} />
+        <div className="qr-presentation-overlay" role="dialog" aria-modal="true" aria-label={`${meta.displayName} QR event mode`}>
+          <header className="qr-presentation-toolbar">
+            <span className="qr-presentation-ready"><span aria-hidden="true" /> Ready to scan</span>
+            <div>
+              <button type="button" disabled={Boolean(busy)} onClick={() => void sharePortableQr()}>
+                {busy === 'share' ? <span className="button-spinner" /> : <Share2 size={18} />}<span>Share</span>
+              </button>
+              <button type="button" onClick={() => void copyLink()}><Copy size={18} /><span>Copy</span></button>
+              <button type="button" onClick={() => setPresenting(false)}><X size={19} /><span>Done</span></button>
             </div>
-            <strong>Scan to connect</strong>
-            {(meta.eventTime || meta.eventLocation) && <small>{[meta.eventTime, meta.eventLocation].filter(Boolean).join(' · ')}</small>}
+          </header>
+
+          <div className="qr-presentation-card">
+            <div className="qr-presentation-identity">
+              <span className="qr-presentation-brand">TAGONCE</span>
+              <h2>{meta.displayName}</h2>
+              {meta.subtitle && <p>{meta.subtitle}</p>}
+            </div>
+
+            <div className="qr-presentation-code">
+              <QRCodeSVG value={shareUrl} size={720} level="L" marginSize={3} title={`Scan to open ${meta.displayName}'s TagOnce card`} />
+            </div>
+
+            <div className="qr-presentation-footer">
+              <strong>Scan to connect</strong>
+              {meta.eventName && <span>{meta.eventName}</span>}
+              {(meta.eventTime || meta.eventLocation) && <small>{[meta.eventTime, meta.eventLocation].filter(Boolean).join(' · ')}</small>}
+            </div>
           </div>
+
+          {status && <div className="qr-presentation-status" aria-live="polite"><Check size={15} /> {status}</div>}
         </div>
       )}
     </>
