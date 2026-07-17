@@ -1,0 +1,60 @@
+.exchange-journey-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 8px;
+  border: 1px solid rgba(73, 54, 92, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 34px rgba(46, 31, 61, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.exchange-journey-nav button {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 6px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: #5b4c64;
+  font: inherit;
+  cursor: pointer;
+}
+
+.exchange-journey-nav button:hover,
+.exchange-journey-nav button:focus-visible {
+  background: #f7f2fb;
+  color: #4f32a8;
+  outline: none;
+}
+
+.exchange-journey-nav button:last-child {
+  background: linear-gradient(135deg, #5f3fbd, #7655d2);
+  color: #fff;
+}
+
+.exchange-journey-nav span {
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+@media (min-width: 760px) {
+  .exchange-journey-nav {
+    display: none;
+  }
+}
+
+@media (max-width: 759px) {
+  .exchange-journey-nav {
+    position: sticky;
+    top: 8px;
+    z-index: 18;
+  }
+}
