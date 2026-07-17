@@ -33,6 +33,7 @@ import {
   getRememberedGoogleIdentity,
   restoreGoogleCalendarReturn,
 } from './lib/calendarService';
+import { contactsMatch, mergeContactRecords, prepareContactRecord } from './lib/contactHistory';
 import { loadLocal, saveLocal } from './lib/storage';
 import type {
   BrandSettings,
@@ -104,18 +105,6 @@ const pageMeta: Record<PageKey, { title: string; eyebrow: string }> = {
   settings: { title: 'Brand settings', eyebrow: 'Beta Studio defaults' },
 };
 
-function identitiesMatch(left: MentionEntity, right: MentionEntity) {
-  if (left.displayName.trim().toLowerCase() === right.displayName.trim().toLowerCase()) return true;
-  const leftUrls = new Set(
-    Object.values(left.mappings)
-      .map((mapping) => mapping?.profileUrl)
-      .filter((value): value is string => Boolean(value)),
-  );
-  return Object.values(right.mappings).some(
-    (mapping) => Boolean(mapping?.profileUrl && leftUrls.has(mapping.profileUrl)),
-  );
-}
-
 function initialPage(): PageKey {
   const params = new URLSearchParams(window.location.search);
   if (params.has('card')) return 'scan';
@@ -139,7 +128,9 @@ function profileWithGoogleIdentity(profile: MyProfile, identity: GoogleAccountId
 
 export default function App() {
   const [activePage, setActivePage] = useState<PageKey>(initialPage);
-  const [entities, setEntities] = useState<MentionEntity[]>(() => loadLocal(ENTITY_KEY, []));
+  const [entities, setEntities] = useState<MentionEntity[]>(() =>
+    loadLocal<MentionEntity[]>(ENTITY_KEY, []).map(prepareContactRecord),
+  );
   const [campaigns, setCampaigns] = useState<Campaign[]>(() => loadLocal(CAMPAIGN_KEY, []));
   const [brand, setBrand] = useState<BrandSettings>(() => loadLocal(BRAND_KEY, defaultBrandSettings));
   const [connections, setConnections] = useState<SocialConnection[]>(() => loadLocal(CONNECTION_KEY, defaultConnections));
@@ -186,29 +177,11 @@ export default function App() {
 
   function mergeScannedContact(incoming: MentionEntity) {
     setEntities((current) => {
-      const existingIndex = current.findIndex((entity) => identitiesMatch(entity, incoming));
-      if (existingIndex < 0) return [incoming, ...current];
+      const preparedIncoming = prepareContactRecord(incoming);
+      const existingIndex = current.findIndex((entity) => contactsMatch(entity, preparedIncoming));
+      if (existingIndex < 0) return [preparedIncoming, ...current];
       const existing = current[existingIndex];
-      const merged: MentionEntity = {
-        ...existing,
-        ...incoming,
-        id: existing.id,
-        createdAt: existing.createdAt,
-        usageCount: existing.usageCount,
-        description: incoming.description || existing.description,
-        title: incoming.title || existing.title,
-        company: incoming.company || existing.company,
-        email: incoming.email || existing.email,
-        phone: incoming.phone || existing.phone,
-        whatsapp: incoming.whatsapp || existing.whatsapp,
-        website: incoming.website || existing.website,
-        avatarUrl: incoming.avatarUrl || existing.avatarUrl,
-        metAt: incoming.metAt || existing.metAt,
-        metOn: incoming.metOn || existing.metOn,
-        notes: [existing.notes, incoming.notes].filter(Boolean).join('\n') || undefined,
-        memoryPhotoDataUrl: incoming.memoryPhotoDataUrl || existing.memoryPhotoDataUrl,
-        mappings: { ...existing.mappings, ...incoming.mappings },
-      };
+      const merged = mergeContactRecords(existing, preparedIncoming);
       return current.map((entity, index) => (index === existingIndex ? merged : entity));
     });
   }
@@ -302,8 +275,8 @@ export default function App() {
         return (
           <AddressBookPage
             entities={entities}
-            onAdd={(entity) => setEntities((current) => [entity, ...current])}
-            onUpdate={(updated) => setEntities((current) => current.map((entity) => entity.id === updated.id ? updated : entity))}
+            onAdd={(entity) => setEntities((current) => [prepareContactRecord(entity), ...current])}
+            onUpdate={(updated) => setEntities((current) => current.map((entity) => entity.id === updated.id ? prepareContactRecord(updated) : entity))}
             onDelete={(entityId) => setEntities((current) => current.filter((entity) => entity.id !== entityId))}
             onScan={() => setActivePage('scan')}
             onCreatePost={() => setActivePage('compose')}
