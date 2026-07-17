@@ -1,0 +1,207 @@
+/* Release 34: five-item mobile product navigation with secondary Beta Studio sheet */
+
+.desktop-beta-nav {
+  display: contents;
+}
+
+.mobile-beta-launcher,
+.mobile-beta-backdrop {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .desktop-beta-nav {
+    display: none;
+  }
+
+  .sidebar {
+    padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+  }
+
+  .sidebar-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 3px;
+  }
+
+  .nav-item {
+    min-height: 58px;
+    gap: 4px;
+    padding: 5px 2px;
+    border-radius: 12px;
+    font-size: 9px;
+    line-height: 1.15;
+    text-align: center;
+  }
+
+  .nav-item svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .nav-item.active {
+    background: rgba(167, 137, 255, 0.13);
+    box-shadow: inset 0 2px var(--lavender);
+  }
+
+  .main-shell {
+    padding-bottom: calc(82px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-beta-launcher {
+    position: fixed;
+    right: 12px;
+    bottom: calc(78px + env(safe-area-inset-bottom));
+    z-index: 42;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 38px;
+    padding: 0 12px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    background: rgba(29, 27, 35, 0.94);
+    color: #d8ff82;
+    box-shadow: 0 12px 28px rgba(24, 18, 31, 0.24);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    font: inherit;
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .mobile-beta-launcher.active {
+    border-color: rgba(201, 255, 98, 0.42);
+    background: #332b43;
+  }
+
+  .mobile-beta-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: block;
+    background: rgba(20, 17, 25, 0.48);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+  }
+
+  .mobile-beta-sheet {
+    position: absolute;
+    right: 12px;
+    bottom: calc(78px + env(safe-area-inset-bottom));
+    left: 12px;
+    width: min(430px, calc(100% - 24px));
+    margin: 0 auto;
+    padding: 18px;
+    border: 1px solid #e6dfea;
+    border-radius: 24px;
+    background: #ffffff;
+    box-shadow: 0 24px 70px rgba(28, 19, 38, 0.3);
+  }
+
+  .mobile-beta-sheet-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 15px;
+  }
+
+  .mobile-beta-sheet-heading > span {
+    display: grid;
+    gap: 3px;
+  }
+
+  .mobile-beta-sheet-heading small {
+    color: #8e8395;
+    font-size: 9px;
+    font-weight: 850;
+    letter-spacing: 0.13em;
+  }
+
+  .mobile-beta-sheet-heading strong {
+    color: #241f29;
+    font-size: 23px;
+    letter-spacing: -0.04em;
+  }
+
+  .mobile-beta-sheet-heading > button {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border: 1px solid #e5dfe9;
+    border-radius: 12px;
+    background: #faf8fc;
+    color: #3d3543;
+    cursor: pointer;
+  }
+
+  .mobile-beta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .mobile-beta-grid > button {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 13px;
+    border: 1px solid #e7e1eb;
+    border-radius: 16px;
+    background: #fcfbfd;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .mobile-beta-grid > button.active {
+    border-color: #bca9ee;
+    background: #f7f3ff;
+  }
+
+  .mobile-beta-icon {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: #eee8fa;
+    color: #6847c7;
+  }
+
+  .mobile-beta-grid > button > span:last-child {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+  }
+
+  .mobile-beta-grid strong {
+    color: #302936;
+    font-size: 12px;
+  }
+
+  .mobile-beta-grid small {
+    color: #857b8b;
+    font-size: 9px;
+    line-height: 1.35;
+  }
+}
+
+@media (max-width: 430px) {
+  .mobile-beta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-beta-sheet {
+    max-height: min(70vh, 520px);
+    overflow-y: auto;
+  }
+}
