@@ -14,7 +14,7 @@ import {
   SlidersHorizontal,
   UserRound,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { createShareUrl, downloadVCard } from '../lib/cardExchange';
 import {
@@ -44,6 +44,7 @@ interface MyCardsPageProps {
 }
 
 type EventPresetKey = 'hackathon' | 'conference' | 'social' | 'dating' | 'custom';
+type DetailFieldKey = 'title' | 'company' | 'email' | 'phone' | 'whatsapp' | 'website';
 
 const eventPresetSelections: Record<Exclude<EventPresetKey, 'custom'>, ShareFieldKey[]> = {
   hackathon: ['title', 'company', 'email', 'website', 'eventName', 'social:linkedin', 'social:github'],
@@ -91,16 +92,18 @@ const defaultSelections: Record<CardMode, ShareFieldKey[]> = {
 };
 
 const detailOptions: Array<{
-  key: 'title' | 'company' | 'email' | 'phone' | 'whatsapp' | 'website';
+  key: DetailFieldKey;
   label: string;
   description: string;
+  placeholder: string;
+  type?: 'text' | 'email' | 'tel' | 'url';
 }> = [
-  { key: 'title', label: 'Title', description: 'Role or professional title' },
-  { key: 'company', label: 'Company', description: 'Organization or brand' },
-  { key: 'email', label: 'Email', description: 'Professional or personal email' },
-  { key: 'phone', label: 'Phone', description: 'Direct phone number' },
-  { key: 'whatsapp', label: 'WhatsApp', description: 'Number or WhatsApp link' },
-  { key: 'website', label: 'Website', description: 'Personal or company website' },
+  { key: 'title', label: 'Title', description: 'Role or professional title', placeholder: 'Founder' },
+  { key: 'company', label: 'Company', description: 'Organization or brand', placeholder: 'AION EHR' },
+  { key: 'email', label: 'Email', description: 'Professional or personal email', placeholder: 'you@company.com', type: 'email' },
+  { key: 'website', label: 'Website', description: 'Personal or company website', placeholder: 'https://...', type: 'url' },
+  { key: 'phone', label: 'Phone', description: 'Direct phone number', placeholder: 'Phone number', type: 'tel' },
+  { key: 'whatsapp', label: 'WhatsApp', description: 'Number or WhatsApp link', placeholder: 'Number or wa.me link', type: 'tel' },
 ];
 
 const modeMeta: Record<CardMode, { label: string; access: string; description: string }> = {
@@ -203,8 +206,10 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
   const [showMoreNetworks, setShowMoreNetworks] = useState(() =>
     optionalSocialPlatforms.some((platform) => Boolean(profile.socialProfiles?.[platform]?.handle || profile.socialProfiles?.[platform]?.profileUrl)),
   );
-  const [mobileEditorOpen, setMobileEditorOpen] = useState(false);
   const [forceCustomEventPreset, setForceCustomEventPreset] = useState(false);
+  const [qrInView, setQrInView] = useState(false);
+  const editorRef = useRef<HTMLElement>(null);
+  const qrPreviewRef = useRef<HTMLElement>(null);
 
   function update<K extends keyof MyProfile>(key: K, value: MyProfile[K]) {
     onChange({ ...profile, [key]: value });
@@ -294,6 +299,17 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
     setSelectedFields(defaultSelections[mode]);
   }
 
+  useEffect(() => {
+    const node = qrPreviewRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver(
+      ([entry]) => setQrInView(entry.isIntersecting),
+      { threshold: 0.16 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   const payload = useMemo<ShareCardPayload>(() => {
     const includes = (key: ShareFieldKey) => selectedFields.includes(key);
     const socials: ShareCardPayload['socials'] = {};
@@ -333,6 +349,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
       eventUrl: sharesEvent ? safeHttpUrl(profile.eventUrl) || undefined : undefined,
       profile: {
         displayName: profile.displayName || 'Your name',
+        avatarUrl: profile.avatarUrl,
         title: includes('title') ? profile.title || undefined : undefined,
         company: includes('company') ? profile.company || undefined : undefined,
         email: includes('email') ? profile.email || undefined : undefined,
@@ -348,6 +365,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
   const activeSocialEntries = Object.entries(payload.socials) as Array<[SocialPlatform, SharedSocialIdentity]>;
   const activeSocials = activeSocialEntries.length;
   const activeDetails = Object.values(payload.profile).filter(Boolean).length;
+  const totalSelected = activeDetails + activeSocials;
   const cardSubtitle = [payload.profile.title, payload.profile.company].filter(Boolean).join(' · ');
   const eventTime = eventTimeSummary(payload.eventStartAt, payload.eventEndAt);
   const exportMeta = {
@@ -358,6 +376,76 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
     eventTime,
     eventLocation: payload.eventLocation,
   };
+
+  function scrollTo(section: 'editor' | 'qr') {
+    const node = section === 'editor' ? editorRef.current : qrPreviewRef.current;
+    node?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function modeSwitch(className: string) {
+    return (
+      <div className={`card-mode-switch ${className}`} role="tablist" aria-label="Card mode">
+        <button className={mode === 'event' ? 'active' : ''} type="button" onClick={() => setMode('event')}><BriefcaseBusiness size={16} /> Event</button>
+        <button className={mode === 'personal' ? 'active' : ''} type="button" onClick={() => setMode('personal')}><UserRound size={16} /> Personal</button>
+        <button className={mode === 'custom' ? 'active' : ''} type="button" onClick={() => setMode('custom')}><SlidersHorizontal size={16} /> Custom</button>
+      </div>
+    );
+  }
+
+  function presetSelector() {
+    if (mode !== 'event') return null;
+    return (
+      <div className="event-card-presets" aria-label="Event card presets">
+        <div className="event-card-presets-heading">
+          <span><strong>Choose the room</strong><small>Start with a recommended sharing mix</small></span>
+          <span className="event-preset-current">{eventPresetOptions.find((preset) => preset.key === activeEventPreset)?.label}</span>
+        </div>
+        <div className="event-card-preset-grid">
+          {eventPresetOptions.map((preset) => (
+            <button
+              className={activeEventPreset === preset.key ? 'active' : ''}
+              type="button"
+              key={preset.key}
+              onClick={() => applyEventPreset(preset.key)}
+              aria-pressed={activeEventPreset === preset.key}
+            >
+              <strong>{preset.label}</strong>
+            </button>
+          ))}
+        </div>
+        <p>{eventPresetOptions.find((preset) => preset.key === activeEventPreset)?.description}</p>
+      </div>
+    );
+  }
+
+  function detailEditor(option: (typeof detailOptions)[number]) {
+    const selected = selectedFields.includes(option.key);
+    const available = Boolean(profile[option.key].trim());
+    return (
+      <div className={`inline-share-field${selected ? ' selected' : ''}${available ? '' : ' unavailable'}`} key={option.key}>
+        <label className="field">
+          <span>{option.label}</span>
+          <input
+            type={option.type || 'text'}
+            value={profile[option.key]}
+            onChange={(event) => update(option.key, event.target.value)}
+            placeholder={option.placeholder}
+          />
+          <small>{option.description}</small>
+        </label>
+        <button
+          className={`card-share-toggle inline-field-share-toggle${selected ? ' selected' : ''}`}
+          type="button"
+          disabled={!available}
+          onClick={() => toggleField(option.key)}
+          aria-pressed={selected}
+        >
+          {selected ? <Check size={13} /> : null}
+          {selected ? 'Shared' : available ? 'Share' : 'Add first'}
+        </button>
+      </div>
+    );
+  }
 
   function socialEditor(platform: SocialPlatform) {
     const identity = socialIdentity(platform);
@@ -400,13 +488,16 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
     );
   }
 
+  const eventContextSelected = selectedFields.includes('eventName');
+  const eventContextAvailable = Boolean(profile.eventName.trim());
+
   return (
     <div className="page-stack card-studio-page pocket-qr-page">
       <section className="card-studio-hero pocket-qr-hero">
         <div>
           <span className="hero-kicker">Pocket QR</span>
-          <h2>Create it here. Carry it everywhere.</h2>
-          <p>Edit exactly what the card shares, then save the QR to Photos, send it to your phone, or present it full-screen.</p>
+          <h2>Build the card, then show the QR.</h2>
+          <p>Fill in your details, tap what you want to share, and jump to the live QR whenever you are ready.</p>
         </div>
         <div className="privacy-promise">
           <ShieldCheck size={18} />
@@ -415,34 +506,47 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
       </section>
 
       <div className="card-studio-grid unified-card-studio-grid pocket-qr-grid">
-        <section className="panel card-profile-editor pocket-qr-editor">
-          <button className="mobile-editor-toggle" type="button" aria-expanded={mobileEditorOpen} onClick={() => setMobileEditorOpen((current) => !current)}>
-            <span><strong>Edit identity and social links</strong><small>Contact details, event context and field selection</small></span>
-            <ChevronDown size={18} />
-          </button>
-
-          <div className={`pocket-qr-editor-content${mobileEditorOpen ? ' mobile-open' : ''}`}>
+        <section ref={editorRef} className="panel card-profile-editor pocket-qr-editor">
+          <div className="pocket-qr-editor-content mobile-open">
             <div className="panel-heading pocket-editor-heading">
-              <div><span className="step-badge">YOU</span><div><h3>Your complete contact identity</h3><p>Edit once, then choose what each card reveals.</p></div></div>
+              <div><span className="step-badge">1</span><div><h3>Fill in your details</h3><p>Use the Share buttons beside each field to control the QR.</p></div></div>
+            </div>
+
+            <div className="mobile-card-setup">
+              <div className="mobile-card-setup-heading"><span className="step-badge">CARD</span><div><strong>Choose your card type</strong><small>{modeMeta[mode].description}</small></div></div>
+              {modeSwitch('mobile-card-mode-switch')}
+              {presetSelector()}
             </div>
 
             <div className="settings-fields card-profile-fields">
-              <label className="field"><span>Name</span><input value={profile.displayName} onChange={(event) => update('displayName', event.target.value)} placeholder="Patrick Tran" /></label>
-              <div className="two-field-row">
-                <label className="field"><span>Title</span><input value={profile.title} onChange={(event) => update('title', event.target.value)} placeholder="Founder" /></label>
-                <label className="field"><span>Company</span><input value={profile.company} onChange={(event) => update('company', event.target.value)} placeholder="AION EHR" /></label>
-              </div>
-              <div className="two-field-row">
-                <label className="field"><span>Email</span><input type="email" value={profile.email} onChange={(event) => update('email', event.target.value)} placeholder="you@company.com" /></label>
-                <label className="field"><span>Website</span><input value={profile.website} onChange={(event) => update('website', event.target.value)} placeholder="https://..." /></label>
-              </div>
-              <div className="two-field-row">
-                <label className="field"><span>Phone</span><input value={profile.phone} onChange={(event) => update('phone', event.target.value)} placeholder="Available to any selected card" /></label>
-                <label className="field"><span>WhatsApp</span><input value={profile.whatsapp} onChange={(event) => update('whatsapp', event.target.value)} placeholder="Number or wa.me link" /></label>
+              <div className="inline-share-field selected locked name-inline-field">
+                <label className="field">
+                  <span>Name</span>
+                  <input value={profile.displayName} onChange={(event) => update('displayName', event.target.value)} placeholder="Patrick Tran" />
+                  <small>Your name is always included on the card.</small>
+                </label>
+                <span className="always-shared-badge"><Lock size={12} /> Always shared</span>
               </div>
 
-              <div className="event-context-fields">
-                <div className="field-heading"><BriefcaseBusiness size={17} /><div><strong>Event context</strong><small>These details travel with the QR when event context is selected.</small></div></div>
+              <div className="inline-detail-grid">
+                {detailOptions.map(detailEditor)}
+              </div>
+
+              <div className={`event-context-fields inline-event-context${eventContextSelected ? ' selected' : ''}`}>
+                <div className="field-heading event-context-heading">
+                  <BriefcaseBusiness size={17} />
+                  <div><strong>Event context</strong><small>Name, time, venue, event page and expiration travel together.</small></div>
+                  <button
+                    className={`card-share-toggle event-context-share-toggle${eventContextSelected ? ' selected' : ''}`}
+                    type="button"
+                    disabled={!eventContextAvailable}
+                    onClick={() => toggleField('eventName')}
+                    aria-pressed={eventContextSelected}
+                  >
+                    {eventContextSelected ? <Check size={13} /> : null}
+                    {eventContextSelected ? 'Shared' : eventContextAvailable ? 'Share context' : 'Add event first'}
+                  </button>
+                </div>
                 <div className="two-field-row">
                   <label className="field"><span>Event name</span><input value={profile.eventName} onChange={(event) => update('eventName', event.target.value)} placeholder="AGI Summit 2026" /></label>
                   <label className="field"><span>Expires after</span><input type="date" value={profile.eventEndsAt} onChange={(event) => update('eventEndsAt', event.target.value)} /></label>
@@ -457,7 +561,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
             </div>
 
             <div className="inline-social-editor">
-              <div className="inline-social-editor-heading"><div><span className="eyebrow">Social profiles</span><h3>Add, edit and choose what this card shares</h3><p>Handles are enough for most networks; a full link is safest for LinkedIn and Facebook.</p></div></div>
+              <div className="inline-social-editor-heading"><div><span className="eyebrow">Social profiles</span><h3>Add, edit and choose what this card shares</h3><p>Each completed network has its own Share toggle.</p></div></div>
               <div className="social-profile-editor-list">{coreSocialPlatforms.map(socialEditor)}</div>
               <button className={`more-networks-button${showMoreNetworks ? ' open' : ''}`} type="button" onClick={() => setShowMoreNetworks((current) => !current)}>
                 <span><strong>{showMoreNetworks ? 'Hide optional networks' : 'Show more networks'}</strong><small>Threads, TikTok, YouTube, Snapchat and Pinterest</small></span>
@@ -468,35 +572,16 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
           </div>
         </section>
 
-        <section className="panel contextual-card-preview pocket-qr-preview">
-          <div className="card-mode-switch pocket-mode-switch" role="tablist" aria-label="Card mode">
-            <button className={mode === 'event' ? 'active' : ''} type="button" onClick={() => setMode('event')}><BriefcaseBusiness size={16} /> Event</button>
-            <button className={mode === 'personal' ? 'active' : ''} type="button" onClick={() => setMode('personal')}><UserRound size={16} /> Personal</button>
-            <button className={mode === 'custom' ? 'active' : ''} type="button" onClick={() => setMode('custom')}><SlidersHorizontal size={16} /> Custom</button>
+        <section ref={qrPreviewRef} id="tagonce-qr-preview" className="panel contextual-card-preview pocket-qr-preview">
+          <div className="desktop-card-setup">
+            {modeSwitch('pocket-mode-switch')}
+            {presetSelector()}
           </div>
 
-          {mode === 'event' && (
-            <div className="event-card-presets" aria-label="Event card presets">
-              <div className="event-card-presets-heading">
-                <span><strong>Choose the room</strong><small>Start with a recommended sharing mix</small></span>
-                <span className="event-preset-current">{eventPresetOptions.find((preset) => preset.key === activeEventPreset)?.label}</span>
-              </div>
-              <div className="event-card-preset-grid">
-                {eventPresetOptions.map((preset) => (
-                  <button
-                    className={activeEventPreset === preset.key ? 'active' : ''}
-                    type="button"
-                    key={preset.key}
-                    onClick={() => applyEventPreset(preset.key)}
-                    aria-pressed={activeEventPreset === preset.key}
-                  >
-                    <strong>{preset.label}</strong>
-                  </button>
-                ))}
-              </div>
-              <p>{eventPresetOptions.find((preset) => preset.key === activeEventPreset)?.description}</p>
-            </div>
-          )}
+          <div className="qr-preview-heading">
+            <span className="step-badge">2</span>
+            <div><strong>Your live QR</strong><small>{totalSelected} selected {totalSelected === 1 ? 'field' : 'fields'} update instantly as you edit.</small></div>
+          </div>
 
           <div className={`share-card share-card-${mode} pocket-share-card`}>
             <div className="share-card-header">
@@ -534,7 +619,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
               {activeSocialEntries.length === 0 && <span className="no-shared-socials">Select a social profile to place a clickable link on this card.</span>}
             </div>
 
-            <div className="shared-field-summary"><span>{activeDetails + activeSocials} selected fields</span><strong>{activeSocials} clickable social {activeSocials === 1 ? 'link' : 'links'}</strong></div>
+            <div className="shared-field-summary"><span>{totalSelected} selected fields</span><strong>{activeSocials} clickable social {activeSocials === 1 ? 'link' : 'links'}</strong></div>
           </div>
 
           <QrPortabilityPanel shareUrl={shareUrl} meta={exportMeta} />
@@ -566,10 +651,10 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
 
             <div className="share-field-group">
               <span className="share-field-group-label">Context</span>
-              <button className={`share-field-chip${selectedFields.includes('eventName') ? ' selected' : ''}${profile.eventName.trim() ? '' : ' unavailable'}`} type="button" disabled={!profile.eventName.trim()} onClick={() => toggleField('eventName')}>
+              <button className={`share-field-chip${eventContextSelected ? ' selected' : ''}${eventContextAvailable ? '' : ' unavailable'}`} type="button" disabled={!eventContextAvailable} onClick={() => toggleField('eventName')}>
                 <BriefcaseBusiness size={14} />
                 <span><strong>Event name, time, venue + expiration</strong><small>{profile.eventName.trim() ? profile.eventName : 'Add an event first'}</small></span>
-                {selectedFields.includes('eventName') && <Check size={14} />}
+                {eventContextSelected && <Check size={14} />}
               </button>
             </div>
           </div>
@@ -577,6 +662,11 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
           <p className="card-handoff-note">The vCard saves contact details. The QR image and live link also carry selected event context and clickable social profiles.</p>
         </section>
       </div>
+
+      <button className={`mobile-qr-jump${qrInView ? ' showing-qr' : ''}`} type="button" onClick={() => scrollTo(qrInView ? 'editor' : 'qr')}>
+        {qrInView ? <SlidersHorizontal size={18} /> : <QrCode size={18} />}
+        <span><strong>{qrInView ? 'Edit card' : 'View QR'}</strong><small>{totalSelected} selected</small></span>
+      </button>
     </div>
   );
 }
