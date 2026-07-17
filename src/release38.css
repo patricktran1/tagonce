@@ -1,0 +1,57 @@
+/* Release 0.38: installable offline event shell */
+.network-status {
+  position: fixed;
+  z-index: 1200;
+  right: 18px;
+  bottom: 18px;
+  max-width: min(390px, calc(100vw - 36px));
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 15px;
+  background: rgba(28, 24, 33, 0.94);
+  color: #fff;
+  box-shadow: 0 18px 48px rgba(24, 16, 29, 0.28);
+  backdrop-filter: blur(16px);
+}
+
+.network-status > svg {
+  flex: 0 0 auto;
+  color: var(--lime);
+}
+
+.network-status > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.network-status strong,
+.network-status small {
+  display: block;
+}
+
+.network-status strong {
+  font-size: 13px;
+}
+
+.network-status small {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.network-status.restored {
+  background: rgba(30, 91, 56, 0.95);
+}
+
+@media (max-width: 760px) {
+  .network-status {
+    right: 12px;
+    bottom: calc(84px + env(safe-area-inset-bottom));
+    left: 12px;
+    max-width: none;
+  }
+}
