@@ -1,0 +1,88 @@
+/* Release 0.35: one account surface across desktop and mobile */
+
+@media (max-width: 760px) {
+  .topbar {
+    align-items: center;
+  }
+
+  .topbar > div:first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .topbar-actions {
+    display: flex !important;
+    flex: 0 0 auto;
+    align-items: center;
+    margin-left: auto;
+  }
+
+  .account-menu-wrap {
+    position: relative;
+    display: block !important;
+    flex: 0 0 auto;
+  }
+
+  .account-menu-trigger {
+    display: inline-flex !important;
+    width: 46px;
+    height: 46px;
+    align-items: center;
+    justify-content: center;
+    padding: 3px;
+    border: 1px solid #e4e0e9;
+    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 7px 22px rgba(43, 31, 55, 0.08);
+  }
+
+  .account-menu-trigger > svg {
+    display: none;
+  }
+
+  .account-menu-trigger .user-avatar {
+    width: 38px;
+    height: 38px;
+    margin: 0;
+  }
+
+  .account-menu-trigger.open {
+    border-color: #bca8ef;
+    background: #faf7ff;
+  }
+
+  .account-menu {
+    position: fixed;
+    top: calc(70px + env(safe-area-inset-top));
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-width: none;
+    max-height: calc(100dvh - 92px - env(safe-area-inset-top));
+    overflow-y: auto;
+    z-index: 80;
+    border-radius: 22px;
+    box-shadow: 0 24px 70px rgba(32, 22, 45, 0.22);
+  }
+
+  .account-menu-summary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .account-status-pill {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .qr-home-profile-card {
+    display: none;
+  }
+
+  .qr-home-hero {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .qr-home-hero-copy {
+    max-width: none;
+  }
+}
