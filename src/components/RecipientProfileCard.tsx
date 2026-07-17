@@ -8,7 +8,6 @@ import {
   MapPin,
   MessageCircle,
   Phone,
-  ShieldCheck,
   X,
 } from 'lucide-react';
 import { socialPlatformMeta, socialProfileUrl } from '../data/socials';
@@ -77,8 +76,6 @@ export function RecipientProfileCard({ payload }: RecipientProfileCardProps) {
   const phone = profile.phone?.trim() || '';
   const eventUrl = safeHttpUrl(payload.eventUrl);
   const eventTime = eventTimeSummary(payload);
-  const eventEnd = payload.eventEndAt ? new Date(payload.eventEndAt) : null;
-  const eventHasEnded = Boolean(eventEnd && !Number.isNaN(eventEnd.getTime()) && eventEnd.getTime() < Date.now());
   const socialEntries = (Object.entries(payload.socials) as Array<[SocialPlatform, SharedSocialIdentity]>)
     .map(([platform, identity]) => ({ platform, identity, url: socialProfileUrl(platform, identity) }))
     .filter((entry) => Boolean(entry.url));
@@ -128,7 +125,6 @@ export function RecipientProfileCard({ payload }: RecipientProfileCardProps) {
           {eventTime && <span><CalendarDays size={15} /> {eventTime}</span>}
           {payload.eventLocation && <span><MapPin size={15} /> {payload.eventLocation}</span>}
           {eventUrl && <a href={eventUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Open event page</a>}
-          {eventHasEnded && <small>The event has ended. This contact card remains valid.</small>}
         </div>
       )}
 
@@ -150,11 +146,6 @@ export function RecipientProfileCard({ payload }: RecipientProfileCardProps) {
           })}
         </div>
       )}
-
-      <div className="recipient-validity-note">
-        <ShieldCheck size={18} />
-        <span><strong>This TagOnce contact card stays valid.</strong><small>Event dates add context; they do not disable the person’s card.</small></span>
-      </div>
 
       <button className="button secondary full-button recipient-download-button" type="button" onClick={() => downloadVCard(payload)}>
         <Download size={17} /> Download complete vCard
