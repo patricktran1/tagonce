@@ -32,12 +32,18 @@ function currentProfileAvatar() {
   }
 }
 
+function permanentContactPayload(payload: ShareCardPayload): ShareCardPayload {
+  const { expiresAt: _legacyExpiration, ...permanentPayload } = payload;
+  return permanentPayload as ShareCardPayload;
+}
+
 function enrichedPayload(payload: ShareCardPayload): ShareCardPayload {
-  const avatarUrl = safeAvatarUrl(payload.profile.avatarUrl) || currentProfileAvatar();
-  if (!avatarUrl || payload.profile.avatarUrl === avatarUrl) return payload;
+  const permanentPayload = permanentContactPayload(payload);
+  const avatarUrl = safeAvatarUrl(permanentPayload.profile.avatarUrl) || currentProfileAvatar();
+  if (!avatarUrl || permanentPayload.profile.avatarUrl === avatarUrl) return permanentPayload;
   return {
-    ...payload,
-    profile: { ...payload.profile, avatarUrl },
+    ...permanentPayload,
+    profile: { ...permanentPayload.profile, avatarUrl },
   };
 }
 
@@ -50,7 +56,7 @@ export function decodeCardPayload(encoded: string): ShareCardPayload {
   const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/');
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
   const decoded = new TextDecoder().decode(base64ToBytes(padded));
-  const payload = JSON.parse(decoded) as ShareCardPayload;
+  const payload = permanentContactPayload(JSON.parse(decoded) as ShareCardPayload);
   if (payload.version !== 1 || !payload.profile?.displayName || !payload.mode) {
     throw new Error('This is not a valid TagOnce card.');
   }
