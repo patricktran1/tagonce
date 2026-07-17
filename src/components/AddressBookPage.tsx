@@ -19,6 +19,7 @@ import { compressImage } from '../lib/cardExchange';
 import { contactEncounters, prepareContactRecord } from '../lib/contactHistory';
 import type { ContactEncounter, MentionEntity, SocialPlatform } from '../types';
 import { AddEntityModal } from './AddEntityModal';
+import { FollowUpCenter } from './FollowUpCenter';
 import { PlatformMark } from './PlatformMark';
 import { ProfileAvatar } from './ProfileAvatar';
 
@@ -211,6 +212,8 @@ export function AddressBookPage({
           <span><strong>{noteCount}</strong><small>With notes</small></span>
         </div>
       </section>
+
+      <FollowUpCenter entities={entities} onUpdate={onUpdate} />
 
       <section className="panel address-book-panel relationship-book-panel">
         <div className="directory-toolbar">
