@@ -25,6 +25,7 @@
 @import './release39.css';
 @import './release40.css';
 @import './release41.css';
+@import './release42.css';
 
 /* Release 0.14: recipient-side event context */
 .received-event-context {
