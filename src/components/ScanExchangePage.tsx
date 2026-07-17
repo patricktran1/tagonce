@@ -15,6 +15,8 @@ interface ScanExchangePageProps {
   onOpenMyCards: () => void;
 }
 
+type ExchangeStep = 'card' | 'context' | 'return';
+
 function incomingCardFromUrl() {
   const token = new URLSearchParams(window.location.search).get('card') || '';
   if (!token) return null;
@@ -34,6 +36,7 @@ export function ScanExchangePage({
   onOpenMyCards,
 }: ScanExchangePageProps) {
   const [incoming] = useState<ShareCardPayload | null>(incomingCardFromUrl);
+  const [activeStep, setActiveStep] = useState<ExchangeStep>('card');
 
   function saveContactWithAvatar(entity: MentionEntity) {
     onSaveContact({
@@ -42,26 +45,48 @@ export function ScanExchangePage({
     });
   }
 
-  function scrollToExchangeStep(selector: string) {
+  function openExchangeStep(step: ExchangeStep, selector: string) {
+    setActiveStep(step);
     document.querySelector<HTMLElement>(selector)?.scrollIntoView({
       behavior: 'smooth',
       block: 'start',
     });
   }
 
+  const pageClasses = [
+    'scan-exchange-page',
+    incoming ? 'has-incoming-card' : '',
+    incoming?.eventName ? 'has-event-context' : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className={`scan-exchange-page${incoming ? ' has-incoming-card' : ''}`}>
+    <div className={pageClasses}>
       {incoming && (
         <nav className="exchange-journey-nav" aria-label="Exchange steps">
-          <button type="button" onClick={() => scrollToExchangeStep('#tagonce-recipient-card')}>
+          <button
+            className={activeStep === 'card' ? 'active' : ''}
+            type="button"
+            aria-pressed={activeStep === 'card'}
+            onClick={() => openExchangeStep('card', '#tagonce-recipient-card')}
+          >
             <UserRound size={17} />
             <span>Their card</span>
           </button>
-          <button type="button" onClick={() => scrollToExchangeStep('.memory-capture-panel')}>
+          <button
+            className={activeStep === 'context' ? 'active' : ''}
+            type="button"
+            aria-pressed={activeStep === 'context'}
+            onClick={() => openExchangeStep('context', '.memory-capture-panel')}
+          >
             <ContactRound size={17} />
             <span>Save context</span>
           </button>
-          <button type="button" onClick={() => scrollToExchangeStep('#tagonce-return-card')}>
+          <button
+            className={activeStep === 'return' ? 'active' : ''}
+            type="button"
+            aria-pressed={activeStep === 'return'}
+            onClick={() => openExchangeStep('return', '#tagonce-return-card')}
+          >
             <Repeat2 size={17} />
             <span>Share back</span>
           </button>
