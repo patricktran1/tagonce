@@ -2,7 +2,6 @@ import {
   CalendarDays,
   Camera,
   ContactRound,
-  ExternalLink,
   Globe2,
   Mail,
   MapPin,
