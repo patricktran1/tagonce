@@ -1,5 +1,8 @@
 # TagOnce
 
+[![CI](https://github.com/patricktran1/tagonce/actions/workflows/ci.yml/badge.svg)](https://github.com/patricktran1/tagonce/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/patricktran1/tagonce/actions/workflows/codeql.yml/badge.svg)](https://github.com/patricktran1/tagonce/actions/workflows/codeql.yml)
+
 **Mention once. Publish everywhere.**
 
 TagOnce is a working front-end MVP for creating one master social post, mapping people and companies once, generating platform-native variants, and preflighting every mention before publishing.
@@ -40,10 +43,23 @@ Open the local URL printed by Vite.
 ## Validation
 
 ```bash
-npm run build
-npm test
-npm run lint
+npm run validate
+npm run test:coverage
 ```
+
+`npm run validate` runs linting, the unit suite, TypeScript compilation, and a production Vite build.
+
+### Automated quality gates
+
+Every pull request and push to `main` runs:
+
+1. Oxlint static analysis
+2. Vitest unit tests
+3. V8 coverage reporting with a retained CI artifact
+4. TypeScript and production Vite build verification
+5. CodeQL security analysis
+
+These checks validate software behavior and packaging. They do not establish that mock publishing represents an approved or operational platform integration.
 
 ## Application structure
 
@@ -121,6 +137,10 @@ No environment variables are required for the built-in generation engine. To act
 ## Product naming
 
 `TagOnce` is the working product name. Complete trademark, app-store, social-handle, and domain clearance before public launch.
+
+## Contributing
+
+Focused contributions are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request.
 
 ## Vercel deployment
 
