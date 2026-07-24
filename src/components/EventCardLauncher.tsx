@@ -12,7 +12,7 @@ import {
   Sparkles,
   Unplug,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   connectGoogleCalendar,
   disconnectGoogleCalendar,
@@ -141,7 +141,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
   );
   const calendarPanelRef = useRef<HTMLElement>(null);
 
-  async function loadEvents(nextRange: CalendarRangeDays = rangeDays) {
+  const loadEvents = useCallback(async (nextRange: CalendarRangeDays) => {
     setLoading(true);
     setError('');
     try {
@@ -166,7 +166,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     } finally {
       setLoading(false);
     }
-  }
+  }, [profile.eventName]);
 
   useEffect(() => {
     let cancelled = false;
@@ -205,7 +205,7 @@ export function EventCardLauncher({ profile, onChange, onOpenCards }: EventCardL
     }
     void initialize();
     return () => { cancelled = true; };
-  }, []);
+  }, [loadEvents]);
 
   function connectWithGoogle() {
     setState('connecting');

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import './App.css';
 import './release02.css';
 import './release03.css';
@@ -195,7 +195,7 @@ export default function App() {
     );
   }
 
-  function mergeScannedContact(incoming: MentionEntity) {
+  const mergeScannedContact = useCallback((incoming: MentionEntity) => {
     setEntities((current) => {
       const sessionAttributed = attachEventSessionToContact(incoming, activeEventSession);
       const preparedIncoming = prepareContactRecord(sessionAttributed);
@@ -205,7 +205,7 @@ export default function App() {
       const merged = mergeContactRecords(existing, preparedIncoming);
       return current.map((entity, index) => (index === existingIndex ? merged : entity));
     });
-  }
+  }, [activeEventSession]);
 
   function startEventSession() {
     const session = eventSessionFromProfile(profile);
@@ -338,7 +338,7 @@ export default function App() {
       case 'settings':
         return <SettingsPage brand={brand} onChange={setBrand} />;
     }
-  }, [activeEventSession, activePage, brand, calendarConnected, campaigns, connections, entities, googleIdentity, profile]);
+  }, [activeEventSession, activePage, brand, calendarConnected, campaigns, connections, entities, googleIdentity, mergeScannedContact, profile]);
 
   return (
     <div className="app-shell">

@@ -14,7 +14,7 @@ import {
   SlidersHorizontal,
   UserRound,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { createShareUrl, downloadVCard } from '../lib/cardExchange';
 import {
@@ -239,12 +239,12 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
     ? 'custom'
     : detectEventPreset(selectedFields);
 
-  function socialIdentity(platform: SocialPlatform): SharedSocialIdentity {
+  const socialIdentity = useCallback((platform: SocialPlatform): SharedSocialIdentity => {
     const saved = profile.socialProfiles?.[platform];
     if (saved?.handle || saved?.profileUrl) return saved;
     const legacy = connectionMap.get(platform as Platform);
     return { handle: legacy?.handle, profileUrl: legacy?.profileUrl };
-  }
+  }, [connectionMap, profile.socialProfiles]);
 
   function setSelectedFields(next: ShareFieldKey[]) {
     onChange({
@@ -359,7 +359,7 @@ export function MyCardsPage({ profile, connections, onChange }: MyCardsPageProps
       },
       socials,
     };
-  }, [connectionMap, mode, profile, selectedFields]);
+  }, [mode, profile, selectedFields, socialIdentity]);
 
   const shareUrl = useMemo(() => createShareUrl(payload), [payload]);
   const activeSocialEntries = Object.entries(payload.socials) as Array<[SocialPlatform, SharedSocialIdentity]>;
