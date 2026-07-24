@@ -1,0 +1,107 @@
+name: Apply lint fixes
+
+on:
+  push:
+    branches: [chore/visible-quality-gates]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: chore/visible-quality-gates
+          fetch-depth: 0
+
+      - name: Apply deterministic source fixes
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str, expected: int = 1) -> None:
+              file = Path(path)
+              text = file.read_text()
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f"{path}: expected {expected} matches, found {count}: {old!r}")
+              file.write_text(text.replace(old, new))
+
+          scan = Path('src/components/ScanPage.tsx')
+          scan_text = scan.read_text()
+          if scan_text.count('useCalendarEvent') < 2:
+              raise SystemExit('ScanPage: expected calendar callback definition and use')
+          scan_text = scan_text.replace('useCalendarEvent', 'selectCalendarEvent')
+          scan_text = scan_text.replace('useEventContext', 'restoreEventContext')
+          scan.write_text(scan_text)
+
+          replace(
+              'src/components/EventCardLauncher.tsx',
+              "import { useEffect, useRef, useState } from 'react';",
+              "import { useCallback, useEffect, useRef, useState } from 'react';",
+          )
+          replace(
+              'src/components/EventCardLauncher.tsx',
+              '  async function loadEvents(nextRange: CalendarRangeDays = rangeDays) {\n',
+              '  const loadEvents = useCallback(async (nextRange: CalendarRangeDays) => {\n',
+          )
+          replace(
+              'src/components/EventCardLauncher.tsx',
+              "    } finally {\n      setLoading(false);\n    }\n  }\n\n  useEffect(() => {",
+              "    } finally {\n      setLoading(false);\n    }\n  }, [profile.eventName]);\n\n  useEffect(() => {",
+          )
+          replace(
+              'src/components/EventCardLauncher.tsx',
+              '  }, []);\n\n  function connectWithGoogle()',
+              '  }, [loadEvents]);\n\n  function connectWithGoogle()',
+          )
+          event_file = Path('src/components/EventCardLauncher.tsx')
+          event_text = event_file.read_text().replace('loadEvents()', 'loadEvents(rangeDays)')
+          event_file.write_text(event_text)
+
+          replace(
+              'src/App.tsx',
+              "import { useEffect, useMemo, useState } from 'react';",
+              "import { useCallback, useEffect, useMemo, useState } from 'react';",
+          )
+          replace(
+              'src/App.tsx',
+              "  function mergeScannedContact(incoming: MentionEntity) {\n    setEntities((current) => {\n      const sessionAttributed = attachEventSessionToContact(incoming, activeEventSession);\n      const preparedIncoming = prepareContactRecord(sessionAttributed);\n      const existingIndex = current.findIndex((entity) => contactsMatch(entity, preparedIncoming));\n      if (existingIndex < 0) return [preparedIncoming, ...current];\n      const existing = current[existingIndex];\n      const merged = mergeContactRecords(existing, preparedIncoming);\n      return current.map((entity, index) => (index === existingIndex ? merged : entity));\n    });\n  }",
+              "  const mergeScannedContact = useCallback((incoming: MentionEntity) => {\n    setEntities((current) => {\n      const sessionAttributed = attachEventSessionToContact(incoming, activeEventSession);\n      const preparedIncoming = prepareContactRecord(sessionAttributed);\n      const existingIndex = current.findIndex((entity) => contactsMatch(entity, preparedIncoming));\n      if (existingIndex < 0) return [preparedIncoming, ...current];\n      const existing = current[existingIndex];\n      const merged = mergeContactRecords(existing, preparedIncoming);\n      return current.map((entity, index) => (index === existingIndex ? merged : entity));\n    });\n  }, [activeEventSession]);",
+          )
+          replace(
+              'src/App.tsx',
+              '  }, [activeEventSession, activePage, brand, calendarConnected, campaigns, connections, entities, googleIdentity, profile]);',
+              '  }, [activeEventSession, activePage, brand, calendarConnected, campaigns, connections, entities, googleIdentity, mergeScannedContact, profile]);',
+          )
+
+          replace(
+              'src/components/MyCardsPage.tsx',
+              "import { useEffect, useMemo, useRef, useState } from 'react';",
+              "import { useCallback, useEffect, useMemo, useRef, useState } from 'react';",
+          )
+          replace(
+              'src/components/MyCardsPage.tsx',
+              "  function socialIdentity(platform: SocialPlatform): SharedSocialIdentity {\n    const saved = profile.socialProfiles?.[platform];\n    if (saved?.handle || saved?.profileUrl) return saved;\n    const legacy = connectionMap.get(platform as Platform);\n    return { handle: legacy?.handle, profileUrl: legacy?.profileUrl };\n  }",
+              "  const socialIdentity = useCallback((platform: SocialPlatform): SharedSocialIdentity => {\n    const saved = profile.socialProfiles?.[platform];\n    if (saved?.handle || saved?.profileUrl) return saved;\n    const legacy = connectionMap.get(platform as Platform);\n    return { handle: legacy?.handle, profileUrl: legacy?.profileUrl };\n  }, [connectionMap, profile.socialProfiles]);",
+          )
+          replace(
+              'src/components/MyCardsPage.tsx',
+              '  }, [connectionMap, mode, profile, selectedFields]);',
+              '  }, [mode, profile, selectedFields, socialIdentity]);',
+          )
+          PY
+
+      - name: Commit fixes and remove one-time workflow
+        run: |
+          rm .github/workflows/apply-lint-fixes.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/App.tsx src/components/EventCardLauncher.tsx src/components/MyCardsPage.tsx src/components/ScanPage.tsx .github/workflows/apply-lint-fixes.yml
+          git commit -m "Fix React hook lint findings"
+          git push origin HEAD:chore/visible-quality-gates
