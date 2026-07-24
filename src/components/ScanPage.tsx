@@ -343,14 +343,14 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
     );
   }
 
-  function useEventContext() {
+  function restoreEventContext() {
     if (!payload?.eventName) return;
     setMetAt(eventMeetingContext(payload));
     setLocationError('');
     setLocationNote('Event context restored from the scanned TagOnce card.');
   }
 
-  function useCalendarEvent(event: CalendarEventSuggestion) {
+  function selectCalendarEvent(event: CalendarEventSuggestion) {
     setMetAt([event.title, event.location].filter(Boolean).join(' · '));
     setLocationError('');
     setLocationNote(`Meeting context filled from Google Calendar: ${event.title}.`);
@@ -574,7 +574,7 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
                   {locating ? 'Finding place…' : 'Use current location'}
                 </button>
                 {payload.eventName && (
-                  <button className="meeting-context-button event-context-button" onClick={useEventContext}>
+                  <button className="meeting-context-button event-context-button" onClick={restoreEventContext}>
                     <CalendarCheck size={15} /> Use QR event: {payload.eventName}
                   </button>
                 )}
@@ -629,7 +629,7 @@ export function ScanPage({ onSaveContact, onOpenAddressBook }: ScanPageProps) {
                         </div>
                         <div className="calendar-suggestion-actions">
                           {event.htmlLink && <a href={event.htmlLink} target="_blank" rel="noreferrer" aria-label={`Open ${event.title} in Google Calendar`}><ExternalLink size={14} /></a>}
-                          <button onClick={() => useCalendarEvent(event)}>Use event</button>
+                          <button onClick={() => selectCalendarEvent(event)}>Use event</button>
                         </div>
                       </article>
                     ))}
